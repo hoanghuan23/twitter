@@ -55,6 +55,13 @@ It checks due sources every 5 minutes by default.
 
 ## API
 
+Accounts:
+
+- `GET /accounts`
+- `GET /accounts/{user_id}`
+- `POST /accounts`
+- `DELETE /accounts/{user_id}`
+
 Sources:
 
 - `GET /sources`
@@ -84,4 +91,3 @@ The existing schema uses `accounts.user_id` as `twitter_sources.user_id`. Add an
 ```bash
 python -m pytest
 ```
-

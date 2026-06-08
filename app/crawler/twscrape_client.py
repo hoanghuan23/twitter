@@ -20,7 +20,7 @@ class TwscrapeClient:
                 raise RuntimeError(
                     "twscrape is not installed. Install dependencies from requirements.txt."
                 ) from exc
-            self._api = API()
+            self._api = API(settings.twscrape_db_path)
         return self._api
 
     async def crawl_source(
@@ -69,4 +69,3 @@ class TwscrapeClient:
         if not path:
             return twitter_url.strip("@")
         return path.split("/")[0].strip("@")
-

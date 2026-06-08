@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,9 +24,8 @@ class Account(Base):
     proxy: Mapped[str | None] = mapped_column(String(255))
     error_msg: Mapped[str | None] = mapped_column(Text)
     stats: Mapped[str | None] = mapped_column(Text)
-    last_used: Mapped[object | None] = mapped_column(DateTime)
+    last_used: Mapped[datetime | None] = mapped_column(DateTime)
     _tx: Mapped[str | None] = mapped_column(Text)
     mfa_code: Mapped[str | None] = mapped_column(String(50))
 
     sources = relationship("TwitterSource", back_populates="account")
-

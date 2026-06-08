@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.routers import jobs, posts, sources
+from app.api.routers import accounts, jobs, posts, sources
 from app.config import settings
 from app.services.scheduler_service import scheduler_service
 
@@ -24,6 +24,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(accounts.router)
 app.include_router(sources.router)
 app.include_router(posts.router)
 app.include_router(jobs.router)
@@ -32,4 +33,3 @@ app.include_router(jobs.router)
 @app.get("/health", tags=["health"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
-
