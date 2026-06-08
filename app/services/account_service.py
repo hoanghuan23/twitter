@@ -35,7 +35,7 @@ class AccountService:
             self.db.rollback()
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
-                "Account username or user_id already exists",
+                "Account username already exists",
             ) from exc
 
     def deactivate_account(self, user_id: int) -> bool:
@@ -66,4 +66,3 @@ class AccountService:
             has_cookies=bool(account.cookies and account.cookies != "{}"),
             has_mfa_code=bool(account.mfa_code),
         )
-

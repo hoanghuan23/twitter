@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.account import Account
+from app.models.account import DEFAULT_ACCOUNT_STATS, Account
 from app.schemas.account import AccountCreate
 
 
@@ -23,7 +23,6 @@ class AccountRepository:
 
     def create(self, payload: AccountCreate) -> Account:
         account = Account(
-            user_id=payload.user_id,
             username=payload.username,
             password=payload.password,
             email=payload.email,
@@ -34,6 +33,7 @@ class AccountRepository:
             headers=payload.headers or "{}",
             cookies=payload.cookies,
             proxy=payload.proxy,
+            stats=DEFAULT_ACCOUNT_STATS,
             mfa_code=payload.mfa_code,
         )
         self.db.add(account)

@@ -22,23 +22,21 @@ class AccountCreate(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "user_id": 0,
-                "username": "string",
-                "password": "string",
-                "email": "string",
-                "email_password": "string",
-                "user_agent": "string",
+                "username": "Null",
+                "password": "Null",
+                "email": "Null",
+                "email_password": "Null",
+                "user_agent": "Null",
                 "active": True,
                 "locks": {},
                 "headers": {},
                 "cookies": {},
-                "proxy": "string",
-                "mfa_code": "string",
+                "proxy": "Null",
+                "mfa_code": "Null",
             }
         }
     )
 
-    user_id: int | None = None
     username: str = Field(min_length=1, max_length=255)
     password: str | None = Field(default=None, max_length=255)
     email: str | None = Field(default=None, max_length=255)

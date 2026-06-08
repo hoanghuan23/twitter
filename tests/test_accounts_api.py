@@ -34,6 +34,7 @@ def test_create_list_get_and_deactivate_account(
     account = db_session.get(Account, body["user_id"])
     assert account is not None
     assert json.loads(account.cookies)["auth_token"] == "secret-token"
+    assert json.loads(account.stats) == {"UserByScreenName": 1}
 
     list_response = client.get("/accounts")
     assert list_response.status_code == 200

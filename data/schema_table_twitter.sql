@@ -8,7 +8,7 @@
 -- accounts: Twitter/X scraper accounts managed by twscrape
 -- ============================================================
 CREATE TABLE accounts (
-        user_id         INTEGER NOT NULL,
+        user_id         INTEGER PRIMARY KEY AUTOINCREMENT,
 
         username        VARCHAR(255) NOT NULL UNIQUE,
         password        VARCHAR(255),
@@ -22,13 +22,11 @@ CREATE TABLE accounts (
         cookies         TEXT,
         proxy           VARCHAR(255),
         error_msg       TEXT,
-        stats           TEXT,
+        stats           TEXT DEFAULT '{"UserByScreenName": 1}',
 
         last_used       DATETIME,
         _tx             TEXT,
-        mfa_code        VARCHAR(50),
-
-        PRIMARY KEY (user_id)
+        mfa_code        VARCHAR(50)
 );
 
 
