@@ -42,6 +42,9 @@ class TwitterSourceRepository:
             self.db.flush()
             return existing
 
+        if data["source_type"] == "account" and data.get("max_days_old") is None:
+            data["max_days_old"] = 1
+
         source = TwitterSource(
             account_username=data["account_username"],
             source_type=data["source_type"],

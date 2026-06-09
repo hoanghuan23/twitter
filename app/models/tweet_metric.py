@@ -18,9 +18,7 @@ class TweetMetric(Base):
     reply_count: Mapped[int | None] = mapped_column(Integer, default=0)
     retweet_count: Mapped[int | None] = mapped_column(Integer, default=0)
     quote_count: Mapped[int | None] = mapped_column(Integer, default=0)
-    bookmark_count: Mapped[int | None] = mapped_column(Integer, default=0)
     recorded_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     tweet = relationship("Tweet", back_populates="metrics")
     job = relationship("TwitterPipelineJob", back_populates="metrics")
-

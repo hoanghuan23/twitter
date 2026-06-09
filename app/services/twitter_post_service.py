@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -58,6 +59,7 @@ class TwitterPostService:
                     lang=tweet.lang,
                     author_id=tweet.author_id,
                     author_username=tweet.author_username,
+                    media=self._media_urls(tweet.media),
                     posted_at=tweet.posted_at,
                     created_at=tweet.created_at,
                     view_count=tweet.view_count,
@@ -65,8 +67,17 @@ class TwitterPostService:
                     reply_count=metric.reply_count if metric else None,
                     retweet_count=metric.retweet_count if metric else None,
                     quote_count=metric.quote_count if metric else None,
-                    bookmark_count=metric.bookmark_count if metric else None,
                 )
             )
         return posts
 
+    def _media_urls(self, media: str | None) -> list[str]:
+        if not media:
+            return []
+        try:
+            value = json.loads(media)
+        except json.JSONDecodeError:
+            return []
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, str)]

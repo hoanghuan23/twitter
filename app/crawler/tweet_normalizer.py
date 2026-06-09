@@ -34,11 +34,68 @@ def _json(value: Any) -> str | None:
         return json.dumps(str(value), ensure_ascii=True)
 
 
+def _iter_items(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    return []
+
+
+def _best_video_url(video: Any) -> str | None:
+    variants = _iter_items(_get(video, "variants", default=[]))
+    if not variants:
+        return None
+
+    bitrate_variants = [
+        variant
+        for variant in variants
+        if _get(variant, "url") and _get(variant, "bitrate") is not None
+    ]
+    if bitrate_variants:
+        best = max(
+            bitrate_variants,
+            key=lambda variant: int(_get(variant, "bitrate", default=0) or 0),
+        )
+        return _get(best, "url")
+
+    for variant in reversed(variants):
+        if url := _get(variant, "url"):
+            return url
+    return None
+
+
+def _media_urls(media: Any) -> list[str]:
+    urls: list[str] = []
+    if media is None:
+        return urls
+
+    for photo in _iter_items(_get(media, "photos", default=[])):
+        if url := _get(photo, "url"):
+            urls.append(str(url))
+
+    for video in _iter_items(_get(media, "videos", default=[])):
+        if url := _best_video_url(video):
+            urls.append(str(url))
+
+    for animated in _iter_items(_get(media, "animated", default=[])):
+        if url := _get(animated, "videoUrl", "video_url"):
+            urls.append(str(url))
+
+    return urls
+
+
 def normalize_tweet(tweet: Any) -> dict[str, Any]:
     user = _get(tweet, "user", "author", default={})
     tweet_id = str(_get(tweet, "id", "id_str", "tweet_id"))
     author_username = _get(user, "username", "screen_name")
     posted_at = _to_datetime(_get(tweet, "date", "created_at", "posted_at"))
+    quoted_tweet = _get(tweet, "quotedTweet", "quoted_tweet")
+    quoted_tweet_id = _get(tweet, "quotedTweetId", "quoted_tweet_id")
+    if quoted_tweet_id is None and quoted_tweet is not None:
+        quoted_tweet_id = _get(quoted_tweet, "id_str", "id", "tweet_id")
 
     return {
         "tweet_id": tweet_id,
@@ -46,9 +103,10 @@ def normalize_tweet(tweet: Any) -> dict[str, Any]:
         "content": _get(tweet, "rawContent", "content", "text", "full_text"),
         "conversation_id": str(_get(tweet, "conversationId", "conversation_id", default=""))
         or None,
-        "quoted_tweet_id": str(_get(tweet, "quotedTweetId", "quoted_tweet_id", default=""))
-        or None,
-        "is_quote_tweet": bool(_get(tweet, "quotedTweet", "is_quote_tweet", default=False)),
+        "quoted_tweet_id": str(quoted_tweet_id or "") or None,
+        "is_quote_tweet": bool(
+            quoted_tweet or _get(tweet, "isQuoteStatus", "is_quote_tweet", default=False)
+        ),
         "in_reply_to_tweet_id": str(
             _get(tweet, "inReplyToTweetId", "in_reply_to_tweet_id", default="")
         )
@@ -60,7 +118,7 @@ def normalize_tweet(tweet: Any) -> dict[str, Any]:
         "mentions": _json(_get(tweet, "mentionedUsers", "mentions")),
         "urls": _json(_get(tweet, "links", "urls")),
         "hashtags": _json(_get(tweet, "hashtags")),
-        "media": _json(_get(tweet, "media")),
+        "media": _json(_media_urls(_get(tweet, "media"))),
         "posted_at": posted_at,
         "created_at": utc_now(),
         "view_count": _get(tweet, "viewCount", "view_count"),
@@ -73,9 +131,5 @@ def normalize_tweet(tweet: Any) -> dict[str, Any]:
             "retweet_count": _get(tweet, "retweetCount", "retweet_count", default=0)
             or 0,
             "quote_count": _get(tweet, "quoteCount", "quote_count", default=0) or 0,
-            "bookmark_count": _get(
-                tweet, "bookmarkCount", "bookmark_count", default=0
-            )
-            or 0,
         },
     }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PostRead(BaseModel):
@@ -15,6 +15,7 @@ class PostRead(BaseModel):
     lang: str | None
     author_id: str | None
     author_username: str | None
+    media: list[str] = Field(default_factory=list)
     posted_at: datetime
     created_at: datetime | None
     view_count: int | None
@@ -22,5 +23,3 @@ class PostRead(BaseModel):
     reply_count: int | None = None
     retweet_count: int | None = None
     quote_count: int | None = None
-    bookmark_count: int | None = None
-
