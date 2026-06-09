@@ -14,10 +14,10 @@ from app.utils.time import utc_now
 
 def test_list_latest_and_get_posts(client: TestClient, db_session: Session) -> None:
     now = utc_now()
-    db_session.add(Account(user_id=1, username="crawler"))
+    db_session.add(Account(username="crawler"))
     source = TwitterSource(
         id=1,
-        user_id=1,
+        account_username="crawler",
         source_type="account",
         twitter_id="12345",
         twitter_url="https://x.com/example",

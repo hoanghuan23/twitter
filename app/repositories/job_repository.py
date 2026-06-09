@@ -17,13 +17,13 @@ class TwitterPipelineJobRepository:
     def create_running(
         self,
         source_id: int | None,
-        session_id: int | None,
+        session_username: str | None,
         job_type: str = "scrape_timeline",
     ) -> TwitterPipelineJob:
         job = TwitterPipelineJob(
             job_type=job_type,
             source_id=source_id,
-            session_id=session_id,
+            session_username=session_username,
             status="running",
             started_at=utc_now(),
         )

@@ -14,7 +14,7 @@ class TwitterPipelineJob(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     job_type: Mapped[str] = mapped_column(String(20), nullable=False, default="scrape_timeline")
     source_id: Mapped[int | None] = mapped_column(ForeignKey("twitter_sources.id"))
-    session_id: Mapped[int | None] = mapped_column(ForeignKey("accounts.user_id"))
+    session_username: Mapped[str | None] = mapped_column(ForeignKey("accounts.username"))
     status: Mapped[str] = mapped_column(String(10), nullable=False, default="pending")
     tweets_found: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     tweets_new: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -29,4 +29,3 @@ class TwitterPipelineJob(Base):
     source = relationship("TwitterSource", back_populates="jobs")
     metrics = relationship("TweetMetric", back_populates="job")
     logs = relationship("TwitterPipelineLog", back_populates="job")
-

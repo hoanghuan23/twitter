@@ -20,7 +20,7 @@ class TwscrapeClient:
                 raise RuntimeError(
                     "twscrape is not installed. Install dependencies from requirements.txt."
                 ) from exc
-            self._api = API(settings.twscrape_db_path)
+            self._api = API(settings.twscrape_db_path, raise_when_no_account=True)
         return self._api
 
     async def crawl_source(
@@ -50,7 +50,7 @@ class TwscrapeClient:
             username = twitter_id or source.source_name or self._username_from_url(
                 source.twitter_url
             )
-            user = await self.api.user_by_login(username)
+            user = await self.get_user_by_login(username)
             user_id = int(user.id)
 
         async for tweet in self.api.user_tweets(user_id, limit=limit):
@@ -69,3 +69,6 @@ class TwscrapeClient:
         if not path:
             return twitter_url.strip("@")
         return path.split("/")[0].strip("@")
+
+    async def get_user_by_login(self, username: str):
+        return await self.api.user_by_login(username)

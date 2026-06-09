@@ -11,7 +11,7 @@ class JobRead(BaseModel):
     id: int
     job_type: str
     source_id: int | None
-    session_id: int | None
+    session_username: str | None
     status: str
     tweets_found: int
     tweets_new: int
@@ -27,4 +27,3 @@ class JobRead(BaseModel):
 class CrawlDueResponse(BaseModel):
     jobs_started: int
     job_ids: list[int]
-

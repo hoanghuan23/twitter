@@ -10,11 +10,36 @@ SourceType = Literal["account", "hashtag", "keyword"]
 
 
 class SourceCreate(BaseModel):
-    user_id: int
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "source_type": "account",
+                "source_name": "user_name",
+                "include_replies": False,
+                "max_days_old": 1,
+                "schedule_tier": 1,
+                "schedule_override_minutes": 15,
+            }
+        }
+    )
+
+    account_username: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+        description=(
+            "Optional crawler account username from the local accounts table. "
+            "Omit this to use the first active crawler account."
+        ),
+    )
     source_type: SourceType
-    twitter_url: str = Field(min_length=1, max_length=255)
+    twitter_url: str | None = Field(default=None, min_length=1, max_length=255)
     twitter_id: str | None = Field(default=None, max_length=50)
-    source_name: str | None = Field(default=None, max_length=255)
+    source_name: str | None = Field(
+        default=None,
+        max_length=255,
+        description="For source_type='account', this is the target Twitter/X username to track.",
+    )
     description: str | None = None
     include_replies: bool = False
     max_days_old: int | None = Field(default=None, ge=1)
@@ -26,7 +51,7 @@ class SourceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    user_id: int
+    account_username: str
     source_type: str
     twitter_id: str | None
     twitter_url: str
@@ -49,4 +74,3 @@ class SourceRead(BaseModel):
 
 class DeleteResponse(BaseModel):
     deleted: bool
-

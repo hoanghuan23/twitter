@@ -36,7 +36,7 @@ class TwitterCrawlerService:
 
         job = self.job_repository.create_running(
             source_id=source.id,
-            session_id=source.user_id,
+            session_username=source.account_username,
             job_type="scrape_timeline",
         )
         self.db.commit()
@@ -78,4 +78,3 @@ class TwitterCrawlerService:
             )
             self.db.commit()
             return job
-

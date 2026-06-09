@@ -29,11 +29,11 @@ class FakeTwscrapeClient:
 
 
 def test_crawler_service_persists_tweets_metrics_and_job(db_session: Session) -> None:
-    db_session.add(Account(user_id=1, username="crawler"))
+    db_session.add(Account(username="crawler"))
     db_session.add(
         TwitterSource(
             id=1,
-            user_id=1,
+            account_username="crawler",
             source_type="account",
             twitter_id="12345",
             twitter_url="https://x.com/example",
@@ -47,6 +47,7 @@ def test_crawler_service_persists_tweets_metrics_and_job(db_session: Session) ->
     job = asyncio.run(service.crawl_source(1))
 
     assert job.status == "done"
+    assert job.session_username == "crawler"
     assert job.tweets_found == 1
     assert job.tweets_new == 1
 
