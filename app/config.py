@@ -22,6 +22,7 @@ class Settings:
         os.getenv("TWITTER_DEFAULT_SCRAPE_INTERVAL_MINUTES", "60")
     )
     default_crawl_limit: int = int(os.getenv("TWITTER_DEFAULT_CRAWL_LIMIT", "50"))
+    account_crawl_limit: int = int(os.getenv("TWITTER_ACCOUNT_CRAWL_LIMIT", "500"))
 
 
 settings = Settings()
