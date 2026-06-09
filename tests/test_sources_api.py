@@ -193,6 +193,35 @@ def test_create_source_updates_existing_account_source(
     assert db_session.query(TwitterSource).count() == 1
 
 
+def test_create_keyword_source_from_source_name(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    db_session.add(Account(username="crawler"))
+    db_session.commit()
+
+    payload = {
+        "source_type": "keyword",
+        "source_name": " world cup ",
+        "include_replies": False,
+        "max_days_old": 1,
+        "schedule_tier": 1,
+        "schedule_override_minutes": 15,
+    }
+
+    first_response = client.post("/sources", json=payload)
+    second_response = client.post("/sources", json=payload)
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 201
+    source = first_response.json()
+    assert source["source_type"] == "keyword"
+    assert source["source_name"] == "world cup"
+    assert source["twitter_url"] == "https://x.com/search?q=world%20cup&src=typed_query"
+    assert second_response.json()["id"] == source["id"]
+    assert db_session.query(TwitterSource).count() == 1
+
+
 def test_create_source_reports_unavailable_twscrape_account(
     client: TestClient,
     db_session: Session,

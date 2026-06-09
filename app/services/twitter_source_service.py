@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -77,13 +78,37 @@ class TwitterSourceService:
         if payload.source_type == "account":
             return await self._account_enriched_fields(payload)
 
-        if not payload.twitter_url or not payload.twitter_url.strip():
+        source_name = (payload.source_name or "").strip()
+        twitter_url = (payload.twitter_url or "").strip()
+        if not source_name and not twitter_url:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY,
-                "twitter_url is required for non-account sources",
+                f"source_name is required for {payload.source_type} sources",
             )
 
-        return {"twitter_url": payload.twitter_url.strip()}
+        search_query = self._normalize_search_query(payload.source_type, source_name or twitter_url)
+        if not search_query:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                f"source_name is required for {payload.source_type} sources",
+            )
+        if not twitter_url:
+            twitter_url = self._search_url(search_query)
+
+        return {
+            "twitter_url": twitter_url,
+            "source_name": search_query,
+        }
+
+    def _normalize_search_query(self, source_type: str, value: str) -> str:
+        query = value.strip()
+        if source_type == "hashtag":
+            tag = query.lstrip("#").strip()
+            return f"#{tag}" if tag else ""
+        return query
+
+    def _search_url(self, query: str) -> str:
+        return f"https://x.com/search?q={quote(query, safe='')}&src=typed_query"
 
     async def _account_enriched_fields(self, payload: SourceCreate) -> dict[str, object]:
         username = (payload.source_name or "").strip().lstrip("@")

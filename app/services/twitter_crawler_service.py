@@ -45,8 +45,13 @@ class TwitterCrawlerService:
         tweets_new = 0
         items_updated = 0
         try:
-            async for raw_tweet in self.client.crawl_source(source, limit=limit):
-                tweets_found += 1
+            raw_tweets = [
+                raw_tweet
+                async for raw_tweet in self.client.crawl_source(source, limit=limit)
+            ]
+            tweets_found = len(raw_tweets)
+
+            for raw_tweet in raw_tweets:
                 data = normalize_tweet(raw_tweet)
                 metric_data = data.pop("metrics", {})
                 tweet, is_new = self.post_repository.upsert(source.id, data)

@@ -71,17 +71,28 @@ class TwitterSourceRepository:
 
     def _get_existing(self, data: dict[str, object]) -> TwitterSource | None:
         twitter_id = data.get("twitter_id")
-        if not twitter_id:
-            return None
+        if twitter_id:
+            stmt = (
+                select(TwitterSource)
+                .where(TwitterSource.account_username == data["account_username"])
+                .where(TwitterSource.twitter_id == str(twitter_id))
+                .where(TwitterSource.source_type == data["source_type"])
+                .limit(1)
+            )
+            return self.db.scalar(stmt)
 
-        stmt = (
-            select(TwitterSource)
-            .where(TwitterSource.account_username == data["account_username"])
-            .where(TwitterSource.twitter_id == str(twitter_id))
-            .where(TwitterSource.source_type == data["source_type"])
-            .limit(1)
-        )
-        return self.db.scalar(stmt)
+        source_name = data.get("source_name")
+        if data["source_type"] != "account" and source_name:
+            stmt = (
+                select(TwitterSource)
+                .where(TwitterSource.account_username == data["account_username"])
+                .where(TwitterSource.source_name == str(source_name))
+                .where(TwitterSource.source_type == data["source_type"])
+                .limit(1)
+            )
+            return self.db.scalar(stmt)
+
+        return None
 
     def _apply_data(self, source: TwitterSource, data: dict[str, object]) -> None:
         source.twitter_url = str(data["twitter_url"])
