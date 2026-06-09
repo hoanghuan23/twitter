@@ -143,7 +143,6 @@ CREATE TABLE tweet_metrics (
         reply_count     INTEGER DEFAULT 0,
         retweet_count   INTEGER DEFAULT 0,
         quote_count     INTEGER DEFAULT 0,
-        bookmark_count  INTEGER DEFAULT 0,
 
         recorded_at     DATETIME,
 

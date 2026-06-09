@@ -21,8 +21,8 @@ class Settings:
     default_scrape_interval_minutes: int = int(
         os.getenv("TWITTER_DEFAULT_SCRAPE_INTERVAL_MINUTES", "60")
     )
-    default_crawl_limit: int = int(os.getenv("TWITTER_DEFAULT_CRAWL_LIMIT", "50"))
-    account_crawl_limit: int = int(os.getenv("TWITTER_ACCOUNT_CRAWL_LIMIT", "500"))
+    default_crawl_limit: int = int(os.getenv("TWITTER_DEFAULT_CRAWL_LIMIT", "50")) # use for source_type = (hashtag/keyword)
+    account_crawl_limit: int = int(os.getenv("TWITTER_ACCOUNT_CRAWL_LIMIT", "500")) # user for source_type = account
 
 
 settings = Settings()

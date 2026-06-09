@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 
 from fastapi.testclient import TestClient
@@ -44,6 +45,7 @@ def test_list_latest_and_get_posts(client: TestClient, db_session: Session) -> N
         posted_at=now,
         created_at=now,
         view_count=100,
+        media=json.dumps(["https://pbs.twimg.com/photo.jpg"]),
     )
     db_session.add_all([older, newer])
     db_session.flush()
@@ -55,6 +57,7 @@ def test_list_latest_and_get_posts(client: TestClient, db_session: Session) -> N
     latest = latest_response.json()
     assert latest[0]["post_id"] == "tweet-2"
     assert latest[0]["like_count"] == 5
+    assert latest[0]["media"] == ["https://pbs.twimg.com/photo.jpg"]
 
     list_response = client.get("/posts", params={"author_username": "example"})
     assert list_response.status_code == 200

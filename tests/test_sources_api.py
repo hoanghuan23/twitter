@@ -58,6 +58,7 @@ def test_create_list_get_and_delete_source(
     assert source["twitter_id"] == "12345"
     assert source["twitter_url"] == "https://x.com/example"
     assert source["source_name"] == "example"
+    assert source["max_days_old"] == 1
     assert source["description"] == "Example profile"
     assert source["followers_count"] == 100
     assert source["following_count"] == 20
