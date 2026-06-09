@@ -23,10 +23,11 @@ class AccountService:
         accounts = self.repository.list(active, limit, offset)
         return [self.to_read(account) for account in accounts]
 
-    def get_account(self, user_id: int) -> AccountRead:
-        return self.to_read(self._get_account(user_id))
+    def get_account(self, username: str) -> AccountRead:
+        return self.to_read(self._get_account(username))
 
-    def create_account(self, payload: AccountCreate) -> AccountRead:
+
+    async def create_account(self, payload: AccountCreate) -> AccountRead:
         try:
             account = self.repository.create(payload)
             self.db.commit()
@@ -38,21 +39,20 @@ class AccountService:
                 "Account username already exists",
             ) from exc
 
-    def deactivate_account(self, user_id: int) -> bool:
-        account = self._get_account(user_id)
+    def deactivate_account(self, username: str) -> bool:
+        account = self._get_account(username)
         self.repository.deactivate(account)
         self.db.commit()
         return True
 
-    def _get_account(self, user_id: int) -> Account:
-        account = self.repository.get(user_id)
+    def _get_account(self, username: str) -> Account:
+        account = self.repository.get(username)
         if account is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
         return account
 
     def to_read(self, account: Account) -> AccountRead:
         return AccountRead(
-            user_id=account.user_id,
             username=account.username,
             email=account.email,
             user_agent=account.user_agent,

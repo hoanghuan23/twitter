@@ -22,17 +22,17 @@ class AccountCreate(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "username": "Null",
-                "password": "Null",
-                "email": "Null",
-                "email_password": "Null",
-                "user_agent": "Null",
+                "username": "crawler",
+                "password": None,
+                "email": None,
+                "email_password": None,
+                "user_agent": None,
                 "active": True,
                 "locks": {},
                 "headers": {},
                 "cookies": {},
-                "proxy": "Null",
-                "mfa_code": "Null",
+                "proxy": None,
+                "mfa_code": None,
             }
         }
     )
@@ -58,7 +58,6 @@ class AccountCreate(BaseModel):
 class AccountRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    user_id: int
     username: str
     email: str | None
     user_agent: str | None

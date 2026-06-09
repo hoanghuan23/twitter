@@ -26,12 +26,11 @@ def get_source(source_id: int, db: Session = Depends(get_db)) -> SourceRead:
 
 
 @router.post("", response_model=SourceRead, status_code=201)
-def create_source(payload: SourceCreate, db: Session = Depends(get_db)) -> SourceRead:
-    return TwitterSourceService(db).create_source(payload)
+async def create_source(payload: SourceCreate, db: Session = Depends(get_db)) -> SourceRead:
+    return await TwitterSourceService(db).create_source(payload)
 
 
 @router.delete("/{source_id}", response_model=DeleteResponse)
 def delete_source(source_id: int, db: Session = Depends(get_db)) -> DeleteResponse:
     deleted = TwitterSourceService(db).deactivate_source(source_id)
     return DeleteResponse(deleted=deleted)
-

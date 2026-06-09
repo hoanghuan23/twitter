@@ -12,7 +12,7 @@ class TwitterSource(Base):
     __tablename__ = "twitter_sources"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("accounts.user_id"), nullable=False)
+    account_username: Mapped[str] = mapped_column(ForeignKey("accounts.username"), nullable=False)
     source_type: Mapped[str] = mapped_column(String(10), nullable=False)
     twitter_id: Mapped[str | None] = mapped_column(String(50))
     twitter_url: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -36,4 +36,3 @@ class TwitterSource(Base):
     tweets = relationship("Tweet", back_populates="source")
     jobs = relationship("TwitterPipelineJob", back_populates="source")
     logs = relationship("TwitterPipelineLog", back_populates="source")
-
