@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 from app.config import settings
 from app.models.twitter_source import TwitterSource
+from app.utils.time import utc_now
 
 
 class TwscrapeClient:
@@ -96,7 +97,7 @@ class TwscrapeClient:
         if source.created_at is None:
             return None
         max_days_old = source.max_days_old or 1
-        return self._to_naive_utc(source.created_at) - timedelta(days=max_days_old)
+        return utc_now() - timedelta(days=max_days_old)
 
     def _tweet_is_older_than(self, tweet: object, cutoff: datetime) -> bool:
         tweet_date = self._get(tweet, "date", "created_at", "posted_at")
