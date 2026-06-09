@@ -8,25 +8,22 @@
 -- accounts: Twitter/X scraper accounts managed by twscrape
 -- ============================================================
 CREATE TABLE accounts (
-        user_id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        username        TEXT PRIMARY KEY NOT NULL COLLATE NOCASE,
+        password        TEXT NOT NULL,
+        email           TEXT NOT NULL COLLATE NOCASE,
+        email_password  TEXT NOT NULL,
+        user_agent      TEXT NOT NULL,
 
-        username        VARCHAR(255) NOT NULL UNIQUE,
-        password        VARCHAR(255),
-        email           VARCHAR(255),
-        email_password  VARCHAR(255),
-        user_agent      VARCHAR(512),
-
-        active          BOOLEAN DEFAULT TRUE,
-        locks           TEXT,
-        headers         TEXT,
-        cookies         TEXT,
-        proxy           VARCHAR(255),
-        error_msg       TEXT,
-        stats           TEXT DEFAULT '{"UserByScreenName": 1}',
-
-        last_used       DATETIME,
-        _tx             TEXT,
-        mfa_code        VARCHAR(50)
+        active          BOOLEAN DEFAULT FALSE NOT NULL,
+        locks           TEXT DEFAULT '{}' NOT NULL,
+        headers         TEXT DEFAULT '{}' NOT NULL,
+        cookies         TEXT DEFAULT '{}' NOT NULL,
+        proxy           TEXT DEFAULT NULL,
+        error_msg       TEXT DEFAULT NULL,
+        stats           TEXT DEFAULT '{}' NOT NULL,
+        last_used       TEXT DEFAULT NULL,
+        _tx             TEXT DEFAULT NULL,
+        mfa_code        TEXT DEFAULT NULL
 );
 
 
@@ -34,8 +31,8 @@ CREATE TABLE accounts (
 -- twitter_sources: Twitter/X accounts, hashtags, or keywords to track
 -- ============================================================
 CREATE TABLE twitter_sources (
-        id              INTEGER NOT NULL,
-        user_id         INTEGER NOT NULL,
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        account_username TEXT NOT NULL,
 
         -- 'account' : track tweets from one account
         -- 'hashtag' : track a hashtag
@@ -68,11 +65,10 @@ CREATE TABLE twitter_sources (
         protected        BOOLEAN DEFAULT FALSE,
         verified         BOOLEAN DEFAULT FALSE,
 
-        PRIMARY KEY (id),
-        UNIQUE (user_id, twitter_id, source_type),
-        FOREIGN KEY(user_id) REFERENCES accounts (user_id)
+        UNIQUE (account_username, twitter_id, source_type),
+        FOREIGN KEY(account_username) REFERENCES accounts (username)
 );
-CREATE INDEX idx_tw_source_user_active ON twitter_sources (user_id, is_active);
+CREATE INDEX idx_tw_source_account_active ON twitter_sources (account_username, is_active);
 CREATE INDEX idx_tw_source_next_scrape ON twitter_sources (next_scrape);
 
 
@@ -80,7 +76,7 @@ CREATE INDEX idx_tw_source_next_scrape ON twitter_sources (next_scrape);
 -- tweets: collected tweets
 -- ============================================================
 CREATE TABLE tweets (
-        id              INTEGER NOT NULL,
+        id              INTEGER PRIMARY KEY,
         source_id       INTEGER NOT NULL,
 
         tweet_id        VARCHAR(50) NOT NULL,
@@ -231,7 +227,7 @@ CREATE TABLE twitter_pipeline_jobs (
                         CHECK (job_type IN ('scrape_timeline', 'scraper_job', 'update_metric', 'analytics')),
 
         source_id       INTEGER REFERENCES twitter_sources(id) ON DELETE SET NULL,
-        session_id      INTEGER REFERENCES accounts(user_id) ON DELETE SET NULL,
+        session_username TEXT REFERENCES accounts(username) ON DELETE SET NULL,
 
         status          VARCHAR(10) NOT NULL DEFAULT 'pending'
                         CHECK (status IN ('pending', 'running', 'done', 'failed')),
