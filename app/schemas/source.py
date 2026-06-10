@@ -14,6 +14,7 @@ class SourceCreate(BaseModel):
         json_schema_extra={
             "example": {
                 "source_type": "account",
+                "topic_id": 1,
                 "source_name": "user_name",
                 "include_replies": False,
                 "max_days_old": 1,
@@ -33,6 +34,7 @@ class SourceCreate(BaseModel):
         ),
     )
     source_type: SourceType
+    topic_id: int | None = Field(default=None, ge=1)
     twitter_url: str | None = Field(default=None, min_length=1, max_length=255)
     twitter_id: str | None = Field(default=None, max_length=50)
     source_name: str | None = Field(
@@ -53,6 +55,7 @@ class SourceRead(BaseModel):
     id: int
     account_username: str
     source_type: str
+    topic_id: int | None
     twitter_id: str | None
     twitter_url: str
     source_name: str | None

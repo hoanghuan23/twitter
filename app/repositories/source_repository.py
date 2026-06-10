@@ -48,6 +48,7 @@ class TwitterSourceRepository:
         source = TwitterSource(
             account_username=data["account_username"],
             source_type=data["source_type"],
+            topic_id=data.get("topic_id"),
             twitter_id=data.get("twitter_id"),
             twitter_url=data["twitter_url"],
             source_name=data.get("source_name"),
@@ -96,6 +97,7 @@ class TwitterSourceRepository:
 
     def _apply_data(self, source: TwitterSource, data: dict[str, object]) -> None:
         source.twitter_url = str(data["twitter_url"])
+        source.topic_id = data.get("topic_id")  # type: ignore[assignment]
         source.source_name = data.get("source_name")  # type: ignore[assignment]
         source.description = data.get("description")  # type: ignore[assignment]
         source.followers_count = data.get("followers_count")  # type: ignore[assignment]

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.crawler.twscrape_client import TwscrapeClient
 from app.models.account import Account
+from app.models.topic import Topic
 from app.models.twitter_source import TwitterSource
 from twscrape.accounts_pool import NoAccountError
 
@@ -41,12 +42,14 @@ def test_create_list_get_and_delete_source(
     monkeypatch.setattr(TwscrapeClient, "get_user_by_login", fake_get_user_by_login)
 
     db_session.add(Account(username="crawler"))
+    db_session.add(Topic(id=1, slug="sports", display_name="Sports"))
     db_session.commit()
 
     create_response = client.post(
         "/sources",
         json={
             "source_type": "account",
+            "topic_id": 1,
             "source_name": " @example ",
         },
     )
@@ -55,6 +58,7 @@ def test_create_list_get_and_delete_source(
     assert source["id"] == 1
     assert source["account_username"] == "crawler"
     assert source["is_active"] is True
+    assert source["topic_id"] == 1
     assert source["twitter_id"] == "12345"
     assert source["twitter_url"] == "https://x.com/example"
     assert source["source_name"] == "example"
@@ -65,6 +69,7 @@ def test_create_list_get_and_delete_source(
     assert source["tweet_count"] == 300
     assert source["protected"] is False
     assert source["verified"] is True
+    assert db_session.get(TwitterSource, source["id"]).topic_id == 1
 
     list_response = client.get("/sources")
     assert list_response.status_code == 200

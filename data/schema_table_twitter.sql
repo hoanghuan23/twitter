@@ -31,13 +31,14 @@ CREATE TABLE accounts (
 -- twitter_sources: Twitter/X accounts, hashtags, or keywords to track
 -- ============================================================
 CREATE TABLE twitter_sources (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        id              INTEGER PRIMARY KEY,
         account_username TEXT NOT NULL,
 
         -- 'account' : track tweets from one account
         -- 'hashtag' : track a hashtag
         -- 'keyword' : track a search keyword
         source_type     VARCHAR(10) NOT NULL CHECK (source_type IN ('account', 'hashtag', 'keyword')),
+        topic_id        INTEGER REFERENCES topics(id),
 
         -- For source_type = 'account', this is the Twitter/X user id.
         twitter_id      VARCHAR(50),
@@ -70,6 +71,16 @@ CREATE TABLE twitter_sources (
 );
 CREATE INDEX idx_tw_source_account_active ON twitter_sources (account_username, is_active);
 CREATE INDEX idx_tw_source_next_scrape ON twitter_sources (next_scrape);
+
+
+-- tweets_topic
+CREATE TABLE topics (
+    id            INTEGER PRIMARY KEY,
+    slug          VARCHAR(50)  UNIQUE NOT NULL,
+    display_name  VARCHAR(100) NOT NULL,
+    display_order INTEGER DEFAULT 0,
+    is_active     BOOLEAN DEFAULT TRUE
+);
 
 
 -- ============================================================

@@ -15,6 +15,7 @@ from app.models import (  # noqa: F401
     TwitterPipelineJob,
     TwitterPipelineLog,
     TwitterSource,
+    Topic,
     Tweet,
     TweetMetric,
 )
@@ -55,4 +56,3 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
             yield test_client
     finally:
         app.dependency_overrides.clear()
-

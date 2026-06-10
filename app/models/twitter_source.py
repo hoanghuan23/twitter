@@ -14,6 +14,7 @@ class TwitterSource(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     account_username: Mapped[str] = mapped_column(ForeignKey("accounts.username"), nullable=False)
     source_type: Mapped[str] = mapped_column(String(10), nullable=False)
+    topic_id: Mapped[int | None] = mapped_column(ForeignKey("topics.id"))
     twitter_id: Mapped[str | None] = mapped_column(String(50))
     twitter_url: Mapped[str] = mapped_column(String(255), nullable=False)
     source_name: Mapped[str | None] = mapped_column(String(255))
@@ -33,6 +34,7 @@ class TwitterSource(Base):
     verified: Mapped[bool | None] = mapped_column(Boolean, default=False)
 
     account = relationship("Account", back_populates="sources")
+    topic = relationship("Topic", back_populates="sources")
     tweets = relationship("Tweet", back_populates="source")
     jobs = relationship("TwitterPipelineJob", back_populates="source")
     logs = relationship("TwitterPipelineLog", back_populates="source")
