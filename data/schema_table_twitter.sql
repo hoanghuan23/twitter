@@ -218,7 +218,6 @@ CREATE TABLE twitter_analytics_cache (
         total_replies   INTEGER DEFAULT 0,
         total_retweets  INTEGER DEFAULT 0,
         total_quotes    INTEGER DEFAULT 0,
-        total_bookmarks INTEGER DEFAULT 0,
 
         avg_likes_per_tweet FLOAT,
         top_tweet_id        VARCHAR(50),
