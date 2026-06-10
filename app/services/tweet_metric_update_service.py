@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import traceback
+from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -21,6 +24,20 @@ from app.utils.time import utc_now
 
 
 logger = logging.getLogger(__name__)
+_metric_update_lock = asyncio.Lock()
+
+
+@dataclass(frozen=True)
+class DueTweetRef:
+    id: int
+    tweet_id: str
+    source_id: int
+
+
+@dataclass(frozen=True)
+class TweetDetailResult:
+    tweet: DueTweetRef
+    raw_tweet: Any | None
 
 
 class TweetMetricUpdateService:
@@ -40,10 +57,18 @@ class TweetMetricUpdateService:
         self.analytics_service = TwitterAnalyticsService(db)
 
     async def update_due_tweet_metrics(self, limit: int) -> TwitterPipelineJob | None:
+        async with _metric_update_lock:
+            return await self._update_due_tweet_metrics(limit)
+
+    async def _update_due_tweet_metrics(self, limit: int) -> TwitterPipelineJob | None:
         due_tweets = self.post_repository.due_for_metric_update(utc_now(), limit)
         if not due_tweets:
             logger.debug("No tweets due for metric update limit=%s", limit)
             return None
+        due_tweet_refs = [
+            DueTweetRef(id=tweet.id, tweet_id=tweet.tweet_id, source_id=tweet.source_id)
+            for tweet in due_tweets
+        ]
 
         job = self.job_repository.create_running(
             source_id=None,
@@ -54,19 +79,34 @@ class TweetMetricUpdateService:
         logger.info(
             "Starting metric update job_id=%s due_tweets=%s limit=%s",
             job.id,
-            len(due_tweets),
+            len(due_tweet_refs),
             limit,
         )
+
+        try:
+            detail_results = await self._fetch_tweet_details(due_tweet_refs)
+        except Exception as exc:
+            return self._mark_job_failed(job.id, exc)
 
         items_updated = 0
         items_failed = 0
         affected_source_ids: set[int] = set()
         affected_dates_by_source_id: dict[int, set[date]] = {}
         try:
-            for tweet in due_tweets:
-                affected_source_ids.add(tweet.source_id)
-                raw_tweet = await self.client.get_tweet_details(tweet.tweet_id)
-                if raw_tweet is None:
+            for result in detail_results:
+                affected_source_ids.add(result.tweet.source_id)
+                tweet = self.post_repository.get(result.tweet.id)
+                if tweet is None:
+                    items_failed += 1
+                    logger.warning(
+                        "Tweet metric target missing job_id=%s tweet_id=%s source_id=%s",
+                        job.id,
+                        result.tweet.tweet_id,
+                        result.tweet.source_id,
+                    )
+                    continue
+
+                if result.raw_tweet is None:
                     self.post_repository.mark_metric_miss(
                         tweet,
                         miss_limit=tweet_metric_rules.metric_scan_miss_limit,
@@ -88,7 +128,7 @@ class TweetMetricUpdateService:
                     )
                     continue
 
-                data = normalize_tweet(raw_tweet)
+                data = normalize_tweet(result.raw_tweet)
                 metric_data = data.pop("metrics", {})
                 previous_metric = self.metric_repository.latest_for_tweet(tweet.id)
                 updated_tweet, _ = self.post_repository.upsert(tweet.source_id, data)
@@ -133,7 +173,7 @@ class TweetMetricUpdateService:
 
             self.job_repository.mark_done(
                 job,
-                tweets_found=len(due_tweets),
+                tweets_found=len(due_tweet_refs),
                 tweets_new=0,
                 items_updated=items_updated,
                 items_failed=items_failed,
@@ -142,7 +182,7 @@ class TweetMetricUpdateService:
                 "Finished metric update job_id=%s total=%s updated=%s failed=%s "
                 "affected_sources=%s",
                 job.id,
-                len(due_tweets),
+                len(due_tweet_refs),
                 items_updated,
                 items_failed,
                 len(affected_source_ids),
@@ -150,23 +190,38 @@ class TweetMetricUpdateService:
             self.db.commit()
             return job
         except Exception as exc:
-            self.db.rollback()
-            error_message = str(exc)
-            job = self.job_repository.get(job.id) or job
-            self.job_repository.mark_failed(job, error_message)
-            logger.exception(
-                "Metric update failed job_id=%s error_type=%s error=%s",
-                job.id,
-                exc.__class__.__name__,
-                error_message,
-            )
-            self.job_repository.log(
-                job_id=job.id,
-                source_id=None,
-                level="ERROR",
-                message=error_message,
-                error_type=exc.__class__.__name__,
-                error_details=traceback.format_exc(),
-            )
-            self.db.commit()
-            return job
+            return self._mark_job_failed(job.id, exc)
+
+    async def _fetch_tweet_details(
+        self,
+        due_tweets: list[DueTweetRef],
+    ) -> list[TweetDetailResult]:
+        results: list[TweetDetailResult] = []
+        for tweet in due_tweets:
+            raw_tweet = await self.client.get_tweet_details(tweet.tweet_id)
+            results.append(TweetDetailResult(tweet=tweet, raw_tweet=raw_tweet))
+        return results
+
+    def _mark_job_failed(self, job_id: int, exc: Exception) -> TwitterPipelineJob:
+        self.db.rollback()
+        error_message = str(exc)
+        job = self.job_repository.get(job_id)
+        if job is None:
+            raise RuntimeError(f"Metric update job not found after failure: {job_id}") from exc
+        self.job_repository.mark_failed(job, error_message)
+        logger.exception(
+            "Metric update failed job_id=%s error_type=%s error=%s",
+            job.id,
+            exc.__class__.__name__,
+            error_message,
+        )
+        self.job_repository.log(
+            job_id=job.id,
+            source_id=None,
+            level="ERROR",
+            message=error_message,
+            error_type=exc.__class__.__name__,
+            error_details=traceback.format_exc(),
+        )
+        self.db.commit()
+        return job
