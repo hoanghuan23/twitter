@@ -33,6 +33,15 @@ class TwitterPostRepository:
         stmt = select(Tweet).order_by(Tweet.posted_at.desc()).limit(limit)
         return list(self.db.scalars(stmt))
 
+    def latest_posted_at_for_source(self, source_id: int) -> datetime | None:
+        stmt = (
+            select(Tweet.posted_at)
+            .where(Tweet.source_id == source_id)
+            .order_by(Tweet.posted_at.desc())
+            .limit(1)
+        )
+        return self.db.scalar(stmt)
+
     def get(self, post_id: int) -> Tweet | None:
         return self.db.get(Tweet, post_id)
 

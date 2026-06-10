@@ -15,36 +15,67 @@ from app.services.twitter_crawler_service import TwitterCrawlerService
 from app.utils.time import utc_now
 
 
+def _raw_tweet(tweet_id: str, content: str, posted_at, likes: int = 7) -> dict:
+    return {
+        "id": tweet_id,
+        "url": f"https://x.com/example/status/{tweet_id}",
+        "rawContent": content,
+        "date": posted_at,
+        "user": {"id": "12345", "username": "example"},
+        "likeCount": likes,
+        "replyCount": 2,
+        "retweetCount": 1,
+        "quoteCount": 0,
+        "viewCount": 1000,
+    }
+
+
 class FakeTwscrapeClient:
     async def crawl_source(self, source: TwitterSource, limit: int | None = None):
-        yield {
-            "id": "tweet-1",
-            "url": "https://x.com/example/status/tweet-1",
-            "rawContent": "hello",
-            "date": utc_now(),
-            "user": {"id": "12345", "username": "example"},
-            "likeCount": 7,
-            "replyCount": 2,
-            "retweetCount": 1,
-            "quoteCount": 0,
-            "viewCount": 1000,
-        }
+        yield _raw_tweet("tweet-1", "hello", utc_now())
 
 
 class ExistingTweetNotDueClient:
+    def __init__(self, posted_at) -> None:
+        self.posted_at = posted_at
+
     async def crawl_source(self, source: TwitterSource, limit: int | None = None):
-        yield {
-            "id": "tweet-1",
-            "url": "https://x.com/example/status/tweet-1",
-            "rawContent": "changed content",
-            "date": utc_now(),
-            "user": {"id": "12345", "username": "example"},
-            "likeCount": 99,
-            "replyCount": 0,
-            "retweetCount": 0,
-            "quoteCount": 0,
-            "viewCount": 5000,
-        }
+        tweet = _raw_tweet("tweet-1", "changed content", self.posted_at, likes=99)
+        tweet["viewCount"] = 5000
+        yield tweet
+
+
+class StopsAfterTwoOldPostsClient:
+    def __init__(self, latest_posted_at) -> None:
+        self.latest_posted_at = latest_posted_at
+        self.yielded_ids: list[str] = []
+
+    async def crawl_source(self, source: TwitterSource, limit: int | None = None):
+        tweets = [
+            _raw_tweet(
+                "newer-tweet",
+                "newer",
+                self.latest_posted_at + timedelta(minutes=5),
+            ),
+            _raw_tweet(
+                "old-tweet-1",
+                "old 1",
+                self.latest_posted_at - timedelta(minutes=1),
+            ),
+            _raw_tweet(
+                "old-tweet-2",
+                "old 2",
+                self.latest_posted_at - timedelta(minutes=2),
+            ),
+            _raw_tweet(
+                "newer-after-stop",
+                "should not be fetched",
+                self.latest_posted_at + timedelta(minutes=10),
+            ),
+        ]
+        for tweet in tweets:
+            self.yielded_ids.append(tweet["id"])
+            yield tweet
 
 
 def test_crawler_service_persists_tweets_metrics_and_job(db_session: Session) -> None:
@@ -145,7 +176,7 @@ def test_crawler_service_skips_existing_tweet_metrics_before_due_time(
     )
     db_session.commit()
 
-    service = TwitterCrawlerService(db_session, client=ExistingTweetNotDueClient())
+    service = TwitterCrawlerService(db_session, client=ExistingTweetNotDueClient(now))
     job = asyncio.run(service.crawl_source(1))
 
     assert job.status == "done"
@@ -164,3 +195,51 @@ def test_crawler_service_skips_existing_tweet_metrics_before_due_time(
     ).all()
     assert len(metrics) == 1
     assert metrics[0].like_count == 7
+
+
+def test_crawler_service_stops_after_two_consecutive_old_posts(
+    db_session: Session,
+) -> None:
+    now = utc_now()
+    db_session.add(Account(username="crawler"))
+    db_session.add(
+        TwitterSource(
+            id=1,
+            account_username="crawler",
+            source_type="account",
+            twitter_id="12345",
+            twitter_url="https://x.com/example",
+            is_active=True,
+            created_at=now,
+        )
+    )
+    db_session.add(
+        Tweet(
+            source_id=1,
+            tweet_id="latest-existing",
+            tweet_url="https://x.com/example/status/latest-existing",
+            content="latest existing",
+            posted_at=now,
+            is_tracked=True,
+            metric_tier="warm",
+            next_metric_update=now + timedelta(minutes=30),
+        )
+    )
+    db_session.commit()
+
+    client = StopsAfterTwoOldPostsClient(now)
+    service = TwitterCrawlerService(db_session, client=client)
+    job = asyncio.run(service.crawl_source(1))
+
+    assert job.status == "done"
+    assert job.tweets_found == 3
+    assert job.tweets_new == 1
+    assert job.items_updated == 0
+    assert client.yielded_ids == ["newer-tweet", "old-tweet-1", "old-tweet-2"]
+
+    assert db_session.scalar(
+        select(Tweet).where(Tweet.tweet_id == "newer-tweet")
+    ) is not None
+    assert db_session.scalar(
+        select(Tweet).where(Tweet.tweet_id == "newer-after-stop")
+    ) is None
