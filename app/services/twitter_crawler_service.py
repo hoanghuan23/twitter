@@ -17,6 +17,7 @@ from app.services.metric_tier_service import TweetMetricTierService
 from app.services.source_tier_service import SourceTierService
 from app.services.twitter_analytics_service import TwitterAnalyticsService
 from app.services.twitter_source_service import TwitterSourceService
+from app.utils.time import utc_now
 
 
 class TwitterCrawlerService:
@@ -58,10 +59,20 @@ class TwitterCrawlerService:
             ]
             tweets_found = len(raw_tweets)
             affected_dates: set[date] = set()
+            current_time = utc_now()
 
             for raw_tweet in raw_tweets:
                 data = normalize_tweet(raw_tweet)
                 metric_data = data.pop("metrics", {})
+                existing_tweet = self.post_repository.get_by_tweet_id(data["tweet_id"])
+                should_record_metric = (
+                    existing_tweet is None
+                    or existing_tweet.next_metric_update is None
+                    or existing_tweet.next_metric_update <= current_time
+                )
+                if not should_record_metric:
+                    continue
+
                 tweet, is_new = self.post_repository.upsert(source.id, data)
                 affected_dates.add(tweet.posted_at.date())
                 previous_metric = self.metric_repository.latest_for_tweet(tweet.id)

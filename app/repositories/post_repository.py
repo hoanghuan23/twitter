@@ -90,7 +90,6 @@ class TwitterPostRepository:
         tweet.possibly_sensitive = data.get("possibly_sensitive", False)
         tweet.hashtags = data.get("hashtags")
         tweet.media = data.get("media")
-        tweet.last_metric_update = utc_now()
         self.db.flush()
         return tweet, is_new
 
