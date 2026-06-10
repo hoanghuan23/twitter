@@ -7,13 +7,15 @@ from fastapi import FastAPI
 from app.api.routers import accounts, jobs, posts, sources
 from app.config import settings
 from app.database import Base, engine
-from app.models import account  # noqa: F401 - import để Base biết model
+from app.database_migrations import ensure_runtime_schema
+import app.models  # noqa: F401
 from app.services.scheduler_service import scheduler_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)  # tạo tất cả bảng khi startup
+    ensure_runtime_schema(engine)
     if settings.scheduler_enabled:
         scheduler_service.start()
     yield

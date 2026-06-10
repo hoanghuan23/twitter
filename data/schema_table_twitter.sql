@@ -62,6 +62,10 @@ CREATE TABLE twitter_sources (
         -- Scheduling
         schedule_tier             INTEGER DEFAULT NULL,
         schedule_override_minutes INTEGER DEFAULT NULL,
+        daily_views               INTEGER,
+        daily_engagement          INTEGER,
+        engagement_rate           FLOAT,
+        source_score              INTEGER,
 
         protected        BOOLEAN DEFAULT FALSE,
         verified         BOOLEAN DEFAULT FALSE,
@@ -120,7 +124,9 @@ CREATE TABLE tweets (
         metric_tier               VARCHAR(20) NOT NULL DEFAULT 'bootstrap'
                                   CHECK (metric_tier IN ('bootstrap', 'hot', 'warm', 'cold', 'expired')),
         next_metric_update        DATETIME,
+        weighted_engagement       INTEGER,
         last_engagement_velocity  FLOAT,
+        engagement_rate           FLOAT,
         cold_check_count          INTEGER NOT NULL DEFAULT 0,
         metric_scan_miss_count    INTEGER NOT NULL DEFAULT 0,
 
