@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas.source import DeleteResponse, SourceCreate, SourceRead
+from app.schemas.source import DeleteResponse, SourceCreate, SourceRead, SourceUpdate
 from app.services.twitter_source_service import TwitterSourceService
 
 router = APIRouter(prefix="/sources", tags=["sources"])
@@ -28,6 +28,15 @@ def get_source(source_id: int, db: Session = Depends(get_db)) -> SourceRead:
 @router.post("", response_model=SourceRead, status_code=201)
 async def create_source(payload: SourceCreate, db: Session = Depends(get_db)) -> SourceRead:
     return await TwitterSourceService(db).create_source(payload)
+
+
+@router.patch("/{source_id}", response_model=SourceRead)
+def update_source(
+    source_id: int,
+    payload: SourceUpdate,
+    db: Session = Depends(get_db),
+) -> SourceRead:
+    return TwitterSourceService(db).update_source(source_id, payload)
 
 
 @router.delete("/{source_id}", response_model=DeleteResponse)

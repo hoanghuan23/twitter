@@ -111,6 +111,12 @@ class TwitterSourceRepository:
         self.db.flush()
         return source
 
+    def update_config(self, source: TwitterSource, data: dict[str, object]) -> TwitterSource:
+        for field, value in data.items():
+            setattr(source, field, value)
+        self.db.flush()
+        return source
+
     def due_sources(self, now: datetime, limit: int) -> list[TwitterSource]:
         stmt = (
             select(TwitterSource)

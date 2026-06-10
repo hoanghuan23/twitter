@@ -10,6 +10,7 @@ from app.crawler.twscrape_client import TwscrapeClient
 from app.models.account import Account
 from app.models.topic import Topic
 from app.models.twitter_source import TwitterSource
+from app.utils.time import utc_now
 from twscrape.accounts_pool import NoAccountError
 
 
@@ -200,6 +201,143 @@ def test_create_source_updates_existing_account_source(
     assert second_response.json()["id"] == first_response.json()["id"]
     assert second_response.json()["followers_count"] == 250
     assert db_session.query(TwitterSource).count() == 1
+
+
+def test_update_source_config_fields(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    now = utc_now()
+    db_session.add(Account(username="crawler"))
+    db_session.add(Topic(id=1, slug="sports", display_name="Sports"))
+    source = TwitterSource(
+        account_username="crawler",
+        source_type="account",
+        twitter_id="12345",
+        twitter_url="https://x.com/example",
+        source_name="example",
+        include_replies=False,
+        max_days_old=1,
+        is_active=True,
+        created_at=now,
+        next_scrape=now,
+        schedule_tier=1,
+    )
+    db_session.add(source)
+    db_session.commit()
+
+    response = client.patch(
+        f"/sources/{source.id}",
+        json={
+            "topic_id": 1,
+            "include_replies": True,
+            "max_days_old": 3,
+            "is_active": False,
+            "schedule_override_minutes": 15,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["topic_id"] == 1
+    assert body["include_replies"] is True
+    assert body["max_days_old"] == 3
+    assert body["is_active"] is False
+    assert body["schedule_override_minutes"] == 15
+
+    db_session.refresh(source)
+    assert source.topic_id == 1
+    assert source.include_replies is True
+    assert source.max_days_old == 3
+    assert source.is_active is False
+    assert source.schedule_override_minutes == 15
+    assert source.next_scrape == now
+    assert source.schedule_tier == 1
+    assert source.twitter_url == "https://x.com/example"
+    assert source.source_name == "example"
+    assert source.twitter_id == "12345"
+    assert source.account_username == "crawler"
+
+
+def test_update_source_clears_schedule_override(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    db_session.add(Account(username="crawler"))
+    source = TwitterSource(
+        account_username="crawler",
+        source_type="account",
+        twitter_id="12345",
+        twitter_url="https://x.com/example",
+        source_name="example",
+        is_active=True,
+        schedule_override_minutes=15,
+    )
+    db_session.add(source)
+    db_session.commit()
+
+    response = client.patch(
+        f"/sources/{source.id}",
+        json={"schedule_override_minutes": None},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["schedule_override_minutes"] is None
+    db_session.refresh(source)
+    assert source.schedule_override_minutes is None
+
+
+def test_update_source_empty_body_returns_existing_source(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    db_session.add(Account(username="crawler"))
+    source = TwitterSource(
+        account_username="crawler",
+        source_type="account",
+        twitter_id="12345",
+        twitter_url="https://x.com/example",
+        source_name="example",
+        is_active=True,
+        schedule_override_minutes=15,
+    )
+    db_session.add(source)
+    db_session.commit()
+
+    response = client.patch(f"/sources/{source.id}", json={})
+
+    assert response.status_code == 200
+    assert response.json()["schedule_override_minutes"] == 15
+    db_session.refresh(source)
+    assert source.schedule_override_minutes == 15
+
+
+def test_update_source_reports_not_found(
+    client: TestClient,
+) -> None:
+    response = client.patch(
+        "/sources/999",
+        json={"schedule_override_minutes": 15},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Source not found"
+
+
+def test_update_source_validates_positive_intervals(
+    client: TestClient,
+) -> None:
+    override_response = client.patch(
+        "/sources/1",
+        json={"schedule_override_minutes": 0},
+    )
+    max_days_response = client.patch(
+        "/sources/1",
+        json={"max_days_old": 0},
+    )
+
+    assert override_response.status_code == 422
+    assert max_days_response.status_code == 422
 
 
 def test_create_keyword_source_from_source_name(

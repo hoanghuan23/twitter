@@ -45,6 +45,14 @@ class SourceCreate(BaseModel):
     max_days_old: int | None = Field(default=None, ge=1)
 
 
+class SourceUpdate(BaseModel):
+    topic_id: int | None = Field(default=None, ge=1)
+    include_replies: bool | None = None
+    max_days_old: int | None = Field(default=None, ge=1)
+    is_active: bool | None = None
+    schedule_override_minutes: int | None = Field(default=None, ge=1)
+
+
 class SourceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

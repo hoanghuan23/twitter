@@ -12,7 +12,7 @@ from app.crawler.twscrape_client import TwscrapeClient
 from app.models.twitter_source import TwitterSource
 from app.repositories.account_repository import AccountRepository
 from app.repositories.source_repository import TwitterSourceRepository
-from app.schemas.source import SourceCreate
+from app.schemas.source import SourceCreate, SourceUpdate
 from app.services.source_tier_service import SourceTierService
 from app.utils.time import utc_now
 
@@ -53,6 +53,13 @@ class TwitterSourceService:
         enriched_fields = await self._source_enriched_fields(payload)
         enriched_fields["account_username"] = account_username
         source = self.repository.create(payload, enriched_fields)
+        self.db.commit()
+        return source
+
+    def update_source(self, source_id: int, payload: SourceUpdate) -> TwitterSource:
+        source = self.get_source(source_id)
+        data = payload.model_dump(exclude_unset=True)
+        self.repository.update_config(source, data)
         self.db.commit()
         return source
 
