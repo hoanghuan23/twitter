@@ -54,6 +54,16 @@ class TwitterSourceService:
         enriched_fields["account_username"] = account_username
         source = self.repository.create(payload, enriched_fields)
         self.db.commit()
+        logger.info(
+            "Created source source_id=%s source_type=%s source_name=%s "
+            "account_username=%s twitter_id=%s next_scrape=%s",
+            source.id,
+            source.source_type,
+            source.source_name,
+            source.account_username,
+            source.twitter_id,
+            source.next_scrape,
+        )
         return source
 
     def update_source(self, source_id: int, payload: SourceUpdate) -> TwitterSource:

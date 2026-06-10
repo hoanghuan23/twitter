@@ -14,7 +14,19 @@ from app.services.scheduler_service import scheduler_service
 
 
 def configure_logging() -> None:
-    logging.getLogger("app").setLevel(logging.INFO)
+    app_logger = logging.getLogger("app")
+    uvicorn_error_logger = logging.getLogger("uvicorn.error")
+    if uvicorn_error_logger.handlers:
+        app_logger.handlers = uvicorn_error_logger.handlers
+        app_logger.propagate = True
+    else:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(levelname)s:%(name)s:%(message)s",
+        )
+    app_logger.setLevel(logging.INFO)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 @asynccontextmanager

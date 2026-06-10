@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import traceback
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -18,6 +18,7 @@ from app.services.metric_tier_service import TweetMetricTierService
 from app.services.source_tier_service import SourceTierService
 from app.services.twitter_analytics_service import TwitterAnalyticsService
 from app.services.twitter_source_service import TwitterSourceService
+from app.utils.time import utc_now
 
 
 logger = logging.getLogger(__name__)
@@ -64,14 +65,19 @@ class TwitterCrawlerService:
         tweets_found = 0
         tweets_new = 0
         items_updated = 0
+        tweets_recent_24h_found = 0
+        tweets_recent_24h_saved = 0
         try:
             affected_dates: set[date] = set()
             latest_posted_at = self.post_repository.latest_posted_at_for_source(source.id)
             consecutive_old_posts = 0
+            recent_24h_cutoff = utc_now() - timedelta(hours=24)
 
             async for raw_tweet in self.client.crawl_source(source, limit=limit):
                 tweets_found += 1
                 data = normalize_tweet(raw_tweet)
+                is_recent_24h = data["posted_at"] >= recent_24h_cutoff
+                tweets_recent_24h_found += 1 if is_recent_24h else 0
                 if (
                     latest_posted_at is not None
                     and data["posted_at"] <= latest_posted_at
@@ -90,6 +96,7 @@ class TwitterCrawlerService:
                 self.metric_tier_service.apply_snapshot(tweet, metric, previous_metric)
                 tweets_new += 1 if is_new else 0
                 items_updated += 0 if is_new else 1
+                tweets_recent_24h_saved += 1 if is_recent_24h else 0
 
             self.source_tier_service.refresh_source_score(source)
             for affected_date in affected_dates:
@@ -103,14 +110,17 @@ class TwitterCrawlerService:
             )
             logger.info(
                 "Finished source scrape job_id=%s source_id=%s source_name=%s "
-                "tweets_found=%s tweets_new=%s items_updated=%s affected_dates=%s "
-                "next_scrape=%s",
+                "tweets_found=%s tweets_new=%s items_updated=%s "
+                "tweets_recent_24h_found=%s tweets_recent_24h_saved=%s "
+                "affected_dates=%s next_scrape=%s",
                 job.id,
                 source.id,
                 source.source_name,
                 tweets_found,
                 tweets_new,
                 items_updated,
+                tweets_recent_24h_found,
+                tweets_recent_24h_saved,
                 len(affected_dates),
                 source.next_scrape,
             )

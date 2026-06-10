@@ -43,10 +43,33 @@ class SchedulerService:
         with SessionLocal() as db:
             source_service = TwitterSourceService(db)
             sources = source_service.due_sources(settings.crawl_due_limit)
+            logger.info(
+                "Scheduler found due sources count=%s limit=%s",
+                len(sources),
+                settings.crawl_due_limit,
+            )
             for source in sources:
+                logger.info(
+                    "Scheduler starting source scrape source_id=%s source_type=%s "
+                    "source_name=%s next_scrape=%s",
+                    source.id,
+                    source.source_type,
+                    source.source_name,
+                    source.next_scrape,
+                )
                 crawler_service = TwitterCrawlerService(db)
                 job = await crawler_service.crawl_source(source.id)
                 job_ids.append(job.id)
+                logger.info(
+                    "Scheduler finished source scrape source_id=%s job_id=%s status=%s "
+                    "tweets_found=%s tweets_new=%s items_updated=%s",
+                    source.id,
+                    job.id,
+                    job.status,
+                    job.tweets_found,
+                    job.tweets_new,
+                    job.items_updated,
+                )
                 if job.status == "failed":
                     logger.warning("Crawl job %s failed: %s", job.id, job.error_message)
         return job_ids
