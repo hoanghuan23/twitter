@@ -67,6 +67,12 @@ class TwitterPostService:
                     reply_count=metric.reply_count if metric else None,
                     retweet_count=metric.retweet_count if metric else None,
                     quote_count=metric.quote_count if metric else None,
+                    weighted_engagement=tweet.weighted_engagement,
+                    last_velocity=tweet.last_engagement_velocity,
+                    engagement_rate=tweet.engagement_rate,
+                    metric_tier=tweet.metric_tier,
+                    last_metric_update=tweet.last_metric_update,
+                    next_metric_update=tweet.next_metric_update,
                 )
             )
         return posts

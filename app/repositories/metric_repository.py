@@ -45,3 +45,12 @@ class TweetMetricRepository:
         for metric in self.db.scalars(stmt):
             latest.setdefault(metric.tweet_id, metric)
         return latest
+
+    def latest_for_tweet(self, tweet_id: int) -> TweetMetric | None:
+        stmt = (
+            select(TweetMetric)
+            .where(TweetMetric.tweet_id == tweet_id)
+            .order_by(TweetMetric.recorded_at.desc(), TweetMetric.id.desc())
+            .limit(1)
+        )
+        return self.db.scalar(stmt)

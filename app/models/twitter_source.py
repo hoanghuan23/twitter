@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -30,6 +30,10 @@ class TwitterSource(Base):
     next_scrape: Mapped[datetime | None] = mapped_column(DateTime)
     schedule_tier: Mapped[int | None] = mapped_column(Integer)
     schedule_override_minutes: Mapped[int | None] = mapped_column(Integer)
+    daily_views: Mapped[int | None] = mapped_column(Integer)
+    daily_engagement: Mapped[int | None] = mapped_column(Integer)
+    engagement_rate: Mapped[float | None] = mapped_column(Float)
+    source_score: Mapped[int | None] = mapped_column(Integer)
     protected: Mapped[bool | None] = mapped_column(Boolean, default=False)
     verified: Mapped[bool | None] = mapped_column(Boolean, default=False)
 
@@ -38,3 +42,4 @@ class TwitterSource(Base):
     tweets = relationship("Tweet", back_populates="source")
     jobs = relationship("TwitterPipelineJob", back_populates="source")
     logs = relationship("TwitterPipelineLog", back_populates="source")
+    analytics_cache = relationship("TwitterAnalyticsCache", back_populates="source")

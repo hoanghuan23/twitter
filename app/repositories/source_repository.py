@@ -60,8 +60,6 @@ class TwitterSourceRepository:
             verified=data.get("verified"),
             include_replies=data["include_replies"],
             max_days_old=data.get("max_days_old"),
-            schedule_tier=data.get("schedule_tier"),
-            schedule_override_minutes=data.get("schedule_override_minutes"),
             is_active=True,
             created_at=now,
             next_scrape=now,
@@ -107,8 +105,6 @@ class TwitterSourceRepository:
         source.verified = data.get("verified")  # type: ignore[assignment]
         source.include_replies = bool(data["include_replies"])
         source.max_days_old = data.get("max_days_old")  # type: ignore[assignment]
-        source.schedule_tier = data.get("schedule_tier")  # type: ignore[assignment]
-        source.schedule_override_minutes = data.get("schedule_override_minutes")  # type: ignore[assignment]
 
     def deactivate(self, source: TwitterSource) -> TwitterSource:
         source.is_active = False

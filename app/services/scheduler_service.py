@@ -5,6 +5,7 @@ import logging
 
 from app.config import settings
 from app.database import SessionLocal
+from app.services.tweet_metric_update_service import TweetMetricUpdateService
 from app.services.twitter_crawler_service import TwitterCrawlerService
 from app.services.twitter_source_service import TwitterSourceService
 
@@ -28,6 +29,7 @@ class SchedulerService:
     async def _run_loop(self) -> None:
         while not self._stopping.is_set():
             await self.crawl_due_sources()
+            await self.update_due_tweet_metrics()
             try:
                 await asyncio.wait_for(
                     self._stopping.wait(),
@@ -49,6 +51,16 @@ class SchedulerService:
                     logger.warning("Crawl job %s failed: %s", job.id, job.error_message)
         return job_ids
 
+    async def update_due_tweet_metrics(self) -> int:
+        with SessionLocal() as db:
+            job = await TweetMetricUpdateService(db).update_due_tweet_metrics(
+                settings.metric_due_limit
+            )
+            if job is None:
+                return 0
+            if job.status == "failed":
+                logger.warning("Metric update job %s failed: %s", job.id, job.error_message)
+            return job.id
+
 
 scheduler_service = SchedulerService()
-

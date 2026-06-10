@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -40,6 +40,30 @@ class TwitterPostRepository:
         stmt = select(Tweet).where(Tweet.tweet_id == tweet_id)
         return self.db.scalar(stmt)
 
+    def recent_for_source(
+        self,
+        source_id: int,
+        cutoff: datetime,
+    ) -> list[Tweet]:
+        stmt = (
+            select(Tweet)
+            .where(Tweet.source_id == source_id)
+            .where(Tweet.posted_at >= cutoff)
+            .order_by(Tweet.posted_at.desc())
+        )
+        return list(self.db.scalars(stmt))
+
+    def due_for_metric_update(self, now: datetime, limit: int) -> list[Tweet]:
+        stmt = (
+            select(Tweet)
+            .where(Tweet.is_tracked == True)  # noqa: E712
+            .where(Tweet.metric_tier != "expired")
+            .where((Tweet.next_metric_update.is_(None)) | (Tweet.next_metric_update <= now))
+            .order_by(Tweet.next_metric_update.asc(), Tweet.id.asc())
+            .limit(limit)
+        )
+        return list(self.db.scalars(stmt))
+
     def upsert(self, source_id: int, data: dict[str, Any]) -> tuple[Tweet, bool]:
         tweet = self.get_by_tweet_id(data["tweet_id"])
         is_new = tweet is None
@@ -69,3 +93,19 @@ class TwitterPostRepository:
         tweet.last_metric_update = utc_now()
         self.db.flush()
         return tweet, is_new
+
+    def mark_metric_miss(
+        self,
+        tweet: Tweet,
+        miss_limit: int,
+        retry_after: timedelta,
+    ) -> Tweet:
+        tweet.metric_scan_miss_count += 1
+        if tweet.metric_scan_miss_count >= miss_limit:
+            tweet.metric_tier = "expired"
+            tweet.is_tracked = False
+            tweet.next_metric_update = None
+        else:
+            tweet.next_metric_update = utc_now() + retry_after
+        self.db.flush()
+        return tweet

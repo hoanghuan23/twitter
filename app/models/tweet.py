@@ -34,7 +34,9 @@ class Tweet(Base):
     last_metric_update: Mapped[datetime | None] = mapped_column(DateTime)
     metric_tier: Mapped[str] = mapped_column(String(20), nullable=False, default="bootstrap")
     next_metric_update: Mapped[datetime | None] = mapped_column(DateTime)
+    weighted_engagement: Mapped[int | None] = mapped_column(Integer)
     last_engagement_velocity: Mapped[float | None] = mapped_column(Float)
+    engagement_rate: Mapped[float | None] = mapped_column(Float)
     cold_check_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     metric_scan_miss_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     view_count: Mapped[int | None] = mapped_column(Integer)
@@ -44,4 +46,3 @@ class Tweet(Base):
 
     source = relationship("TwitterSource", back_populates="tweets")
     metrics = relationship("TweetMetric", back_populates="tweet")
-

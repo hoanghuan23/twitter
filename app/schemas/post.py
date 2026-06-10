@@ -23,3 +23,9 @@ class PostRead(BaseModel):
     reply_count: int | None = None
     retweet_count: int | None = None
     quote_count: int | None = None
+    weighted_engagement: int | None = None
+    last_velocity: float | None = None
+    engagement_rate: float | None = None
+    metric_tier: str | None = None
+    last_metric_update: datetime | None = None
+    next_metric_update: datetime | None = None

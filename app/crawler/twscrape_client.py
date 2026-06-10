@@ -137,3 +137,6 @@ class TwscrapeClient:
 
     async def get_user_by_login(self, username: str):
         return await self.api.user_by_login(username)
+
+    async def get_tweet_details(self, tweet_id: str):
+        return await self.api.tweet_details(int(tweet_id))

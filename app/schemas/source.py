@@ -18,8 +18,6 @@ class SourceCreate(BaseModel):
                 "source_name": "user_name",
                 "include_replies": False,
                 "max_days_old": 1,
-                "schedule_tier": 1,
-                "schedule_override_minutes": 15,
             }
         }
     )
@@ -45,8 +43,6 @@ class SourceCreate(BaseModel):
     description: str | None = None
     include_replies: bool = False
     max_days_old: int | None = Field(default=None, ge=1)
-    schedule_tier: int | None = Field(default=None, ge=1)
-    schedule_override_minutes: int | None = Field(default=None, ge=1)
 
 
 class SourceRead(BaseModel):
@@ -71,6 +67,10 @@ class SourceRead(BaseModel):
     next_scrape: datetime | None
     schedule_tier: int | None
     schedule_override_minutes: int | None
+    daily_views: int | None
+    daily_engagement: int | None
+    engagement_rate: float | None
+    source_score: int | None
     protected: bool | None
     verified: bool | None
 

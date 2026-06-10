@@ -13,6 +13,7 @@ from app.models.twitter_source import TwitterSource
 from app.repositories.account_repository import AccountRepository
 from app.repositories.source_repository import TwitterSourceRepository
 from app.schemas.source import SourceCreate
+from app.services.source_tier_service import SourceTierService
 from app.utils.time import utc_now
 
 try:
@@ -31,6 +32,7 @@ class TwitterSourceService:
         self.repository = TwitterSourceRepository(db)
         self.account_repository = AccountRepository(db)
         self.twscrape_client = TwscrapeClient()
+        self.source_tier_service = SourceTierService(db)
 
     def list_sources(
         self,
@@ -181,12 +183,6 @@ class TwitterSourceService:
         self.db.flush()
 
     def scrape_interval_minutes(self, source: TwitterSource) -> int:
-        if source.schedule_override_minutes:
-            return source.schedule_override_minutes
-        if source.schedule_tier == 1:
-            return 15
-        if source.schedule_tier == 2:
-            return 60
-        if source.schedule_tier == 3:
-            return 360
-        return settings.default_scrape_interval_minutes
+        if source.schedule_tier is None and not source.schedule_override_minutes:
+            return settings.default_scrape_interval_minutes
+        return self.source_tier_service.interval_minutes(source)

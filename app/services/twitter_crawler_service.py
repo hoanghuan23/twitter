@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import traceback
+from datetime import date
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -12,6 +13,9 @@ from app.repositories.job_repository import TwitterPipelineJobRepository
 from app.repositories.metric_repository import TweetMetricRepository
 from app.repositories.post_repository import TwitterPostRepository
 from app.repositories.source_repository import TwitterSourceRepository
+from app.services.metric_tier_service import TweetMetricTierService
+from app.services.source_tier_service import SourceTierService
+from app.services.twitter_analytics_service import TwitterAnalyticsService
 from app.services.twitter_source_service import TwitterSourceService
 
 
@@ -28,6 +32,9 @@ class TwitterCrawlerService:
         self.metric_repository = TweetMetricRepository(db)
         self.job_repository = TwitterPipelineJobRepository(db)
         self.source_service = TwitterSourceService(db)
+        self.metric_tier_service = TweetMetricTierService()
+        self.source_tier_service = SourceTierService(db)
+        self.analytics_service = TwitterAnalyticsService(db)
 
     async def crawl_source(self, source_id: int, limit: int | None = None) -> TwitterPipelineJob:
         source = self.source_repository.get(source_id)
@@ -50,15 +57,22 @@ class TwitterCrawlerService:
                 async for raw_tweet in self.client.crawl_source(source, limit=limit)
             ]
             tweets_found = len(raw_tweets)
+            affected_dates: set[date] = set()
 
             for raw_tweet in raw_tweets:
                 data = normalize_tweet(raw_tweet)
                 metric_data = data.pop("metrics", {})
                 tweet, is_new = self.post_repository.upsert(source.id, data)
-                self.metric_repository.create_snapshot(tweet.id, job.id, metric_data)
+                affected_dates.add(tweet.posted_at.date())
+                previous_metric = self.metric_repository.latest_for_tweet(tweet.id)
+                metric = self.metric_repository.create_snapshot(tweet.id, job.id, metric_data)
+                self.metric_tier_service.apply_snapshot(tweet, metric, previous_metric)
                 tweets_new += 1 if is_new else 0
                 items_updated += 0 if is_new else 1
 
+            self.source_tier_service.refresh_source_score(source)
+            for affected_date in affected_dates:
+                self.analytics_service.refresh_daily_cache(source, affected_date)
             self.source_service.mark_scraped(source)
             self.job_repository.mark_done(
                 job,
