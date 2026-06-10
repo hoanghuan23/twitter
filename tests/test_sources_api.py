@@ -67,6 +67,10 @@ def test_create_list_get_and_delete_source(
     assert source["followers_count"] == 100
     assert source["following_count"] == 20
     assert source["tweet_count"] == 300
+    assert source["daily_views"] is None
+    assert source["daily_engagement"] is None
+    assert source["engagement_rate"] is None
+    assert source["source_score"] is None
     assert source["protected"] is False
     assert source["verified"] is True
     assert db_session.get(TwitterSource, source["id"]).topic_id == 1
@@ -210,8 +214,6 @@ def test_create_keyword_source_from_source_name(
         "source_name": " world cup ",
         "include_replies": False,
         "max_days_old": 1,
-        "schedule_tier": 1,
-        "schedule_override_minutes": 15,
     }
 
     first_response = client.post("/sources", json=payload)

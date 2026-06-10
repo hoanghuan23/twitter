@@ -45,6 +45,12 @@ def test_list_latest_and_get_posts(client: TestClient, db_session: Session) -> N
         posted_at=now,
         created_at=now,
         view_count=100,
+        weighted_engagement=5,
+        last_engagement_velocity=2.5,
+        engagement_rate=5,
+        metric_tier="warm",
+        last_metric_update=now,
+        next_metric_update=now + timedelta(minutes=15),
         media=json.dumps(["https://pbs.twimg.com/photo.jpg"]),
     )
     db_session.add_all([older, newer])
@@ -57,6 +63,12 @@ def test_list_latest_and_get_posts(client: TestClient, db_session: Session) -> N
     latest = latest_response.json()
     assert latest[0]["post_id"] == "tweet-2"
     assert latest[0]["like_count"] == 5
+    assert latest[0]["weighted_engagement"] == 5
+    assert latest[0]["last_velocity"] == 2.5
+    assert latest[0]["engagement_rate"] == 5
+    assert latest[0]["metric_tier"] == "warm"
+    assert latest[0]["last_metric_update"] is not None
+    assert latest[0]["next_metric_update"] is not None
     assert latest[0]["media"] == ["https://pbs.twimg.com/photo.jpg"]
 
     list_response = client.get("/posts", params={"author_username": "example"})
