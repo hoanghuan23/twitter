@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -12,8 +13,13 @@ import app.models  # noqa: F401
 from app.services.scheduler_service import scheduler_service
 
 
+def configure_logging() -> None:
+    logging.getLogger("app").setLevel(logging.INFO)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    configure_logging()
     Base.metadata.create_all(bind=engine)  # tạo tất cả bảng khi startup
     ensure_runtime_schema(engine)
     if settings.scheduler_enabled:

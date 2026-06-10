@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import traceback
 from datetime import date
 
@@ -17,6 +18,9 @@ from app.services.metric_tier_service import TweetMetricTierService
 from app.services.source_tier_service import SourceTierService
 from app.services.twitter_analytics_service import TwitterAnalyticsService
 from app.services.twitter_source_service import TwitterSourceService
+
+
+logger = logging.getLogger(__name__)
 
 
 class TwitterCrawlerService:
@@ -47,6 +51,15 @@ class TwitterCrawlerService:
             job_type="scrape_timeline",
         )
         self.db.commit()
+        logger.info(
+            "Starting source scrape job_id=%s source_id=%s source_type=%s "
+            "source_name=%s limit=%s",
+            job.id,
+            source.id,
+            source.source_type,
+            source.source_name,
+            limit,
+        )
 
         tweets_found = 0
         tweets_new = 0
@@ -88,6 +101,19 @@ class TwitterCrawlerService:
                 tweets_new=tweets_new,
                 items_updated=items_updated,
             )
+            logger.info(
+                "Finished source scrape job_id=%s source_id=%s source_name=%s "
+                "tweets_found=%s tweets_new=%s items_updated=%s affected_dates=%s "
+                "next_scrape=%s",
+                job.id,
+                source.id,
+                source.source_name,
+                tweets_found,
+                tweets_new,
+                items_updated,
+                len(affected_dates),
+                source.next_scrape,
+            )
             self.db.commit()
             return job
         except Exception as exc:
@@ -95,6 +121,15 @@ class TwitterCrawlerService:
             error_message = str(exc)
             job = self.job_repository.get(job.id) or job
             self.job_repository.mark_failed(job, error_message)
+            logger.exception(
+                "Source scrape failed job_id=%s source_id=%s source_name=%s "
+                "error_type=%s error=%s",
+                job.id,
+                source.id,
+                source.source_name,
+                exc.__class__.__name__,
+                error_message,
+            )
             self.job_repository.log(
                 job_id=job.id,
                 source_id=source.id,

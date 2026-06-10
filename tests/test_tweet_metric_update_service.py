@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import timedelta
 
 from sqlalchemy import select
@@ -34,6 +35,7 @@ class FakeTweetDetailsClient:
 
 def test_update_due_tweet_metrics_creates_update_job_and_refreshes_tiers(
     db_session: Session,
+    caplog,
 ) -> None:
     now = utc_now()
     db_session.add(Account(username="crawler"))
@@ -67,6 +69,7 @@ def test_update_due_tweet_metrics_creates_update_job_and_refreshes_tiers(
     db_session.commit()
 
     service = TweetMetricUpdateService(db_session, client=FakeTweetDetailsClient())
+    caplog.set_level(logging.INFO, logger="app.services.tweet_metric_update_service")
     job = asyncio.run(service.update_due_tweet_metrics(limit=10))
 
     assert job is not None
@@ -90,3 +93,14 @@ def test_update_due_tweet_metrics_creates_update_job_and_refreshes_tiers(
     assert analytics.total_tweets == 1
     assert analytics.total_likes == 200
     assert analytics.top_tweet_id == "123"
+
+    log_messages = "\n".join(caplog.messages)
+    assert "Updated tweet metrics" in log_messages
+    assert f"job_id={job.id}" in log_messages
+    assert "tweet_id=123" in log_messages
+    assert "like_count=200" in log_messages
+    assert "reply_count=0" in log_messages
+    assert "retweet_count=0" in log_messages
+    assert "quote_count=0" in log_messages
+    assert "Finished metric update" in log_messages
+    assert "updated=1" in log_messages

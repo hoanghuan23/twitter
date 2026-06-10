@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import timedelta
 
 from sqlalchemy import select
@@ -78,7 +79,10 @@ class StopsAfterTwoOldPostsClient:
             yield tweet
 
 
-def test_crawler_service_persists_tweets_metrics_and_job(db_session: Session) -> None:
+def test_crawler_service_persists_tweets_metrics_and_job(
+    db_session: Session,
+    caplog,
+) -> None:
     db_session.add(Account(username="crawler"))
     db_session.add(
         TwitterSource(
@@ -94,6 +98,7 @@ def test_crawler_service_persists_tweets_metrics_and_job(db_session: Session) ->
     db_session.commit()
 
     service = TwitterCrawlerService(db_session, client=FakeTwscrapeClient())
+    caplog.set_level(logging.INFO, logger="app.services.twitter_crawler_service")
     job = asyncio.run(service.crawl_source(1))
 
     assert job.status == "done"
@@ -132,6 +137,13 @@ def test_crawler_service_persists_tweets_metrics_and_job(db_session: Session) ->
     assert analytics.total_quotes == 0
     assert analytics.avg_likes_per_tweet == 7
     assert analytics.top_tweet_id == "tweet-1"
+
+    log_messages = "\n".join(caplog.messages)
+    assert "Finished source scrape" in log_messages
+    assert f"job_id={job.id}" in log_messages
+    assert "source_id=1" in log_messages
+    assert "tweets_found=1" in log_messages
+    assert "tweets_new=1" in log_messages
 
 
 def test_crawler_service_skips_existing_tweet_metrics_before_due_time(
