@@ -61,8 +61,18 @@ class TweetMetricUpdateService:
             return await self._update_due_tweet_metrics(limit)
 
     async def _update_due_tweet_metrics(self, limit: int) -> TwitterPipelineJob | None:
-        due_tweets = self.post_repository.due_for_metric_update(utc_now(), limit)
+        now = utc_now()
+        cutoff = now - timedelta(hours=tweet_metric_rules.expired_age_hours)
+        expired_count = self.post_repository.expire_metric_tracking_older_than(cutoff)
+        due_tweets = self.post_repository.due_for_metric_update(now, cutoff, limit)
         if not due_tweets:
+            if expired_count:
+                logger.info(
+                    "Expired old tweet metric tracking expired_count=%s cutoff=%s",
+                    expired_count,
+                    cutoff,
+                )
+                self.db.commit()
             logger.debug("No tweets due for metric update limit=%s", limit)
             return None
         due_tweet_refs = [

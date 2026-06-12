@@ -87,3 +87,32 @@ def test_hot_warm_and_expired_tiers() -> None:
     assert expired.metric_tier == "expired"
     assert expired.is_tracked is False
     assert expired.next_metric_update is None
+
+
+def test_tweets_at_or_over_24h_expire_even_with_hot_metrics() -> None:
+    now = utc_now()
+    at_cutoff = Tweet(
+        source_id=1,
+        tweet_id="at-cutoff",
+        tweet_url="https://x.com/example/status/at-cutoff",
+        posted_at=now - timedelta(hours=24),
+        view_count=1_000,
+    )
+    over_cutoff = Tweet(
+        source_id=1,
+        tweet_id="over-cutoff",
+        tweet_url="https://x.com/example/status/over-cutoff",
+        posted_at=now - timedelta(hours=25),
+        view_count=1_000,
+    )
+
+    for tweet in (at_cutoff, over_cutoff):
+        TweetMetricTierService().apply_snapshot(
+            tweet,
+            TweetMetric(like_count=10_000, recorded_at=now),
+            TweetMetric(like_count=0, recorded_at=now - timedelta(hours=1)),
+        )
+
+        assert tweet.metric_tier == "expired"
+        assert tweet.is_tracked is False
+        assert tweet.next_metric_update is None

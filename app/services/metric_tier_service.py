@@ -49,10 +49,9 @@ class TweetMetricTierService:
 
         if previous_metric is None:
             velocity = 0.0
-            tier = "bootstrap"
         else:
             velocity = self._velocity(score, previous_metric, update_time)
-            tier = self._tier(tweet, velocity, rate, update_time)
+        tier = self._tier(tweet, velocity, rate, update_time, previous_metric is not None)
 
         tweet.last_engagement_velocity = velocity
         tweet.metric_tier = tier
@@ -88,13 +87,12 @@ class TweetMetricTierService:
         velocity: float,
         rate: float,
         update_time: datetime,
+        has_previous_metric: bool,
     ) -> str:
-        if (
-            velocity < tweet_metric_rules.cold_velocity_min
-            and self._tweet_age_hours(tweet, update_time)
-            > tweet_metric_rules.expired_age_hours
-        ):
+        if self._tweet_age_hours(tweet, update_time) >= tweet_metric_rules.expired_age_hours:
             return "expired"
+        if not has_previous_metric:
+            return "bootstrap"
         if (
             velocity >= tweet_metric_rules.hot_velocity_min
             or rate >= tweet_metric_rules.hot_engagement_rate_min

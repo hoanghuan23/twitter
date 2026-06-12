@@ -62,16 +62,43 @@ class TwitterPostRepository:
         )
         return list(self.db.scalars(stmt))
 
-    def due_for_metric_update(self, now: datetime, limit: int) -> list[Tweet]:
+    def due_for_metric_update(
+        self,
+        now: datetime,
+        cutoff: datetime,
+        limit: int,
+    ) -> list[Tweet]:
         stmt = (
             select(Tweet)
             .where(Tweet.is_tracked == True)  # noqa: E712
             .where(Tweet.metric_tier != "expired")
+            .where(Tweet.posted_at > cutoff)
             .where((Tweet.next_metric_update.is_(None)) | (Tweet.next_metric_update <= now))
             .order_by(Tweet.next_metric_update.asc(), Tweet.id.asc())
             .limit(limit)
         )
         return list(self.db.scalars(stmt))
+
+    def expire_metric_tracking_older_than(self, cutoff: datetime) -> int:
+        stmt = (
+            select(Tweet)
+            .where(Tweet.is_tracked == True)  # noqa: E712
+            .where(Tweet.metric_tier != "expired")
+            .where(Tweet.posted_at <= cutoff)
+        )
+        count = 0
+        for tweet in self.db.scalars(stmt):
+            self.mark_metric_expired(tweet)
+            count += 1
+        if count:
+            self.db.flush()
+        return count
+
+    def mark_metric_expired(self, tweet: Tweet) -> Tweet:
+        tweet.metric_tier = "expired"
+        tweet.is_tracked = False
+        tweet.next_metric_update = None
+        return tweet
 
     def upsert(self, source_id: int, data: dict[str, Any]) -> tuple[Tweet, bool]:
         tweet = self.get_by_tweet_id(data["tweet_id"])
@@ -110,9 +137,7 @@ class TwitterPostRepository:
     ) -> Tweet:
         tweet.metric_scan_miss_count += 1
         if tweet.metric_scan_miss_count >= miss_limit:
-            tweet.metric_tier = "expired"
-            tweet.is_tracked = False
-            tweet.next_metric_update = None
+            self.mark_metric_expired(tweet)
         else:
             tweet.next_metric_update = utc_now() + retry_after
         self.db.flush()

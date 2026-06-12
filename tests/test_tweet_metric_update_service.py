@@ -235,6 +235,56 @@ def test_update_due_tweet_metrics_marks_job_failed_when_fetch_raises(
     assert log.message == "fetch failed for 123"
 
 
+def test_update_due_tweet_metrics_expires_old_tweets_without_fetching_details(
+    db_session: Session,
+) -> None:
+    now = utc_now()
+    db_session.add(Account(username="crawler"))
+    source = TwitterSource(
+        id=1,
+        account_username="crawler",
+        source_type="account",
+        twitter_id="12345",
+        twitter_url="https://x.com/example",
+        source_name="example",
+        is_active=True,
+        created_at=now,
+    )
+    tweet = Tweet(
+        source_id=1,
+        tweet_id="old",
+        tweet_url="https://x.com/example/status/old",
+        content="old content",
+        posted_at=now - timedelta(hours=24),
+        created_at=now,
+        is_tracked=True,
+        metric_tier="hot",
+        next_metric_update=now - timedelta(minutes=1),
+        view_count=100,
+    )
+    db_session.add_all([source, tweet])
+    db_session.commit()
+
+    class NoFetchTweetDetailsClient:
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        async def get_tweet_details(self, tweet_id: str):
+            self.calls.append(tweet_id)
+            raise AssertionError("old tweet details should not be fetched")
+
+    fake_client = NoFetchTweetDetailsClient()
+    service = TweetMetricUpdateService(db_session, client=fake_client)
+    job = asyncio.run(service.update_due_tweet_metrics(limit=10))
+
+    assert job is None
+    assert fake_client.calls == []
+    assert tweet.metric_tier == "expired"
+    assert tweet.is_tracked is False
+    assert tweet.next_metric_update is None
+    assert db_session.scalar(select(func.count()).select_from(TweetMetric)) == 0
+
+
 def test_update_due_tweet_metrics_waits_for_in_process_lock(db_session: Session) -> None:
     async def run() -> None:
         await metric_update_module._metric_update_lock.acquire()

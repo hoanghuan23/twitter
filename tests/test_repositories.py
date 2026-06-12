@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from sqlalchemy.orm import Session
 
 from app.models.account import Account
@@ -85,10 +87,72 @@ def test_due_metric_update_skips_expired_and_untracked(db_session: Session) -> N
                 metric_tier="warm",
                 next_metric_update=now,
             ),
+            Tweet(
+                source_id=1,
+                tweet_id="old-due",
+                tweet_url="https://x.com/example/status/old-due",
+                posted_at=now - timedelta(hours=24),
+                is_tracked=True,
+                metric_tier="warm",
+                next_metric_update=now,
+            ),
         ]
     )
     db_session.commit()
 
-    due = TwitterPostRepository(db_session).due_for_metric_update(now, limit=10)
+    due = TwitterPostRepository(db_session).due_for_metric_update(
+        now,
+        now - timedelta(hours=24),
+        limit=10,
+    )
 
     assert [tweet.tweet_id for tweet in due] == ["due"]
+
+
+def test_expire_metric_tracking_older_than_marks_tracked_old_tweets(
+    db_session: Session,
+) -> None:
+    now = utc_now()
+    db_session.add(Account(username="crawler"))
+    db_session.add(
+        TwitterSource(
+            id=1,
+            account_username="crawler",
+            source_type="account",
+            twitter_id="12345",
+            twitter_url="https://x.com/example",
+            is_active=True,
+            created_at=now,
+        )
+    )
+    old_tweet = Tweet(
+        source_id=1,
+        tweet_id="old",
+        tweet_url="https://x.com/example/status/old",
+        posted_at=now - timedelta(hours=24),
+        is_tracked=True,
+        metric_tier="hot",
+        next_metric_update=now,
+    )
+    recent_tweet = Tweet(
+        source_id=1,
+        tweet_id="recent",
+        tweet_url="https://x.com/example/status/recent",
+        posted_at=now - timedelta(hours=23, minutes=59),
+        is_tracked=True,
+        metric_tier="warm",
+        next_metric_update=now,
+    )
+    db_session.add_all([old_tweet, recent_tweet])
+    db_session.commit()
+
+    expired_count = TwitterPostRepository(db_session).expire_metric_tracking_older_than(
+        now - timedelta(hours=24)
+    )
+
+    assert expired_count == 1
+    assert old_tweet.metric_tier == "expired"
+    assert old_tweet.is_tracked is False
+    assert old_tweet.next_metric_update is None
+    assert recent_tweet.metric_tier == "warm"
+    assert recent_tweet.is_tracked is True
