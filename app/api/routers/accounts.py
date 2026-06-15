@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas.account import AccountCreate, AccountDeleteResponse, AccountRead
+from app.schemas.account import (
+    AccountCookieUpdate,
+    AccountCreate,
+    AccountDeleteResponse,
+    AccountRead,
+)
 from app.services.account_service import AccountService
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
@@ -30,6 +35,15 @@ async def create_account(payload: AccountCreate, db: Session = Depends(get_db)) 
     return await AccountService(db).create_account(payload)
 
 
+@router.patch("/{username}", response_model=AccountRead)
+def update_account_cookies(
+    username: str,
+    payload: AccountCookieUpdate,
+    db: Session = Depends(get_db),
+) -> AccountRead:
+    return AccountService(db).update_account_cookies(username, payload)
+
+
 @router.delete("/{username}", response_model=AccountDeleteResponse)
 def delete_account(
     username: str,
@@ -37,4 +51,3 @@ def delete_account(
 ) -> AccountDeleteResponse:
     deleted = AccountService(db).deactivate_account(username)
     return AccountDeleteResponse(deleted=deleted)
-

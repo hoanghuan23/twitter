@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.account import Account
 from app.repositories.account_repository import AccountRepository
-from app.schemas.account import AccountCreate, AccountRead
+from app.schemas.account import AccountCookieUpdate, AccountCreate, AccountRead
 
 
 class AccountService:
@@ -38,6 +38,16 @@ class AccountService:
                 status.HTTP_409_CONFLICT,
                 "Account username already exists",
             ) from exc
+
+    def update_account_cookies(
+        self,
+        username: str,
+        payload: AccountCookieUpdate,
+    ) -> AccountRead:
+        account = self._get_account(username)
+        account = self.repository.update_cookies(account, payload)
+        self.db.commit()
+        return self.to_read(account)
 
     def deactivate_account(self, username: str) -> bool:
         account = self._get_account(username)

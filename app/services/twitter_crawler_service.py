@@ -52,6 +52,7 @@ class TwitterCrawlerService:
             job_type="scrape_timeline",
         )
         self.db.commit()
+        logger.info("------------------")
         logger.info(
             "Starting source scrape job_id=%s source_id=%s source_type=%s "
             "source_name=%s limit=%s",
@@ -109,6 +110,7 @@ class TwitterCrawlerService:
                 items_updated=items_updated,
             )
             logger.info(
+                "------------------\n"
                 "Finished source scrape job_id=%s source_id=%s source_name=%s "
                 "tweets_found=%s tweets_new=%s items_updated=%s "
                 "tweets_recent_24h_found=%s tweets_recent_24h_saved=%s "

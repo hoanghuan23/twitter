@@ -79,13 +79,18 @@ class TweetMetricUpdateService:
             DueTweetRef(id=tweet.id, tweet_id=tweet.tweet_id, source_id=tweet.source_id)
             for tweet in due_tweets
         ]
+        job_source_id = due_tweet_refs[0].source_id
+        due_tweet_refs = [
+            tweet for tweet in due_tweet_refs if tweet.source_id == job_source_id
+        ]
 
         job = self.job_repository.create_running(
-            source_id=None,
+            source_id=job_source_id,
             session_username=None,
             job_type="update_metric",
         )
         self.db.commit()
+        logger.info("------------------")
         logger.info(
             "Starting metric update job_id=%s due_tweets=%s limit=%s",
             job.id,
@@ -189,6 +194,7 @@ class TweetMetricUpdateService:
                 items_failed=items_failed,
             )
             logger.info(
+                "------------------\n"
                 "Finished metric update job_id=%s total=%s updated=%s failed=%s "
                 "affected_sources=%s",
                 job.id,
@@ -227,7 +233,7 @@ class TweetMetricUpdateService:
         )
         self.job_repository.log(
             job_id=job.id,
-            source_id=None,
+            source_id=job.source_id,
             level="ERROR",
             message=error_message,
             error_type=exc.__class__.__name__,

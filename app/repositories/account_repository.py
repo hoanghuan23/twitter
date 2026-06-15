@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.account import DEFAULT_ACCOUNT_STATS, DEFAULT_USER_AGENT, Account
-from app.schemas.account import AccountCreate
+from app.schemas.account import AccountCookieUpdate, AccountCreate
 
 
 class AccountRepository:
@@ -54,3 +54,11 @@ class AccountRepository:
         self.db.flush()
         return account
 
+    def update_cookies(
+        self,
+        account: Account,
+        payload: AccountCookieUpdate,
+    ) -> Account:
+        account.cookies = payload.cookies or "{}"
+        self.db.flush()
+        return account

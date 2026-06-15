@@ -55,6 +55,23 @@ class AccountCreate(BaseModel):
         return to_json_text(value)
 
 
+class AccountCookieUpdate(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "cookies": {"auth_token": "secret-token", "ct0": "secret-ct0"},
+            }
+        }
+    )
+
+    cookies: JsonText
+
+    @field_validator("cookies", mode="after")
+    @classmethod
+    def serialize_json_text(cls, value: JsonText) -> str | None:
+        return to_json_text(value) or "{}"
+
+
 class AccountRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

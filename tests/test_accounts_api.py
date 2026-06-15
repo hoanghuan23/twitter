@@ -53,3 +53,38 @@ def test_create_list_get_and_deactivate_account(
     assert active_response.status_code == 200
     assert active_response.json() == []
 
+
+def test_update_account_cookies(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    db_session.add(Account(username="crawler", cookies="{}"))
+    db_session.commit()
+
+    response = client.patch(
+        "/accounts/crawler",
+        json={"cookies": {"auth_token": "new-token", "ct0": "new-ct0"}},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["username"] == "crawler"
+    assert body["has_cookies"] is True
+    assert "cookies" not in body
+
+    account = db_session.get(Account, "crawler")
+    assert account is not None
+    assert json.loads(account.cookies) == {
+        "auth_token": "new-token",
+        "ct0": "new-ct0",
+    }
+
+
+def test_update_account_cookies_not_found(client: TestClient) -> None:
+    response = client.patch(
+        "/accounts/missing",
+        json={"cookies": {"auth_token": "new-token"}},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Account not found"

@@ -91,6 +91,7 @@ def test_update_due_tweet_metrics_creates_update_job_and_refreshes_tiers(
 
     assert job is not None
     assert job.job_type == "update_metric"
+    assert job.source_id == source.id
     assert job.status == "done"
     assert job.items_updated == 1
 
@@ -231,8 +232,70 @@ def test_update_due_tweet_metrics_marks_job_failed_when_fetch_raises(
     assert job.error_message == "fetch failed for 123"
     log = db_session.scalar(select(TwitterPipelineLog).where(TwitterPipelineLog.job_id == job.id))
     assert log is not None
+    assert log.source_id == source.id
     assert log.error_type == "RuntimeError"
     assert log.message == "fetch failed for 123"
+
+
+def test_update_due_tweet_metrics_processes_one_source_per_job(
+    db_session: Session,
+) -> None:
+    now = utc_now()
+    db_session.add(Account(username="crawler"))
+    sources = [
+        TwitterSource(
+            id=source_id,
+            account_username="crawler",
+            source_type="account",
+            twitter_id=str(source_id),
+            twitter_url=f"https://x.com/example{source_id}",
+            source_name=f"example{source_id}",
+            is_active=True,
+            created_at=now,
+        )
+        for source_id in (1, 2)
+    ]
+    tweets = [
+        Tweet(
+            source_id=source_id,
+            tweet_id=str(tweet_id),
+            tweet_url=f"https://x.com/example/status/{tweet_id}",
+            content="old",
+            posted_at=now,
+            created_at=now,
+            is_tracked=True,
+            metric_tier="warm",
+            next_metric_update=now - timedelta(minutes=1),
+            view_count=100,
+        )
+        for source_id, tweet_id in ((1, 123), (2, 456))
+    ]
+    db_session.add_all([*sources, *tweets])
+    db_session.flush()
+    for tweet in tweets:
+        db_session.add(
+            TweetMetric(tweet_id=tweet.id, like_count=0, recorded_at=now - timedelta(hours=1))
+        )
+    db_session.commit()
+
+    class RecordingTweetDetailsClient:
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        async def get_tweet_details(self, tweet_id: str):
+            self.calls.append(tweet_id)
+            return raw_tweet(tweet_id, f"updated-{tweet_id}", like_count=int(tweet_id))
+
+    fake_client = RecordingTweetDetailsClient()
+    service = TweetMetricUpdateService(db_session, client=fake_client)
+    job = asyncio.run(service.update_due_tweet_metrics(limit=10))
+
+    assert job is not None
+    assert job.source_id == 1
+    assert job.items_updated == 1
+    assert fake_client.calls == ["123"]
+    assert db_session.scalar(select(Tweet.content).where(Tweet.tweet_id == "123")) == "updated-123"
+    assert db_session.scalar(select(Tweet.content).where(Tweet.tweet_id == "456")) == "old"
 
 
 def test_update_due_tweet_metrics_expires_old_tweets_without_fetching_details(

@@ -49,6 +49,7 @@ class SchedulerService:
                 settings.crawl_due_limit,
             )
             for source in sources:
+                logger.info("------------------")
                 logger.info(
                     "Scheduler starting source scrape source_id=%s source_type=%s "
                     "source_name=%s next_scrape=%s",
@@ -61,6 +62,7 @@ class SchedulerService:
                 job = await crawler_service.crawl_source(source.id)
                 job_ids.append(job.id)
                 logger.info(
+                    "------------------\n"
                     "Scheduler finished source scrape source_id=%s job_id=%s status=%s "
                     "tweets_found=%s tweets_new=%s items_updated=%s",
                     source.id,
