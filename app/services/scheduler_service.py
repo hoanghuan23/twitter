@@ -28,15 +28,17 @@ class SchedulerService:
 
     async def _run_loop(self) -> None:
         while not self._stopping.is_set():
-            await self.crawl_due_sources()
-            await self.update_due_tweet_metrics()
             try:
                 await asyncio.wait_for(
                     self._stopping.wait(),
                     timeout=settings.scheduler_interval_seconds,
                 )
             except TimeoutError:
-                continue
+                pass
+
+            if not self._stopping.is_set():
+                await self.crawl_due_sources()
+                await self.update_due_tweet_metrics()
 
     async def crawl_due_sources(self) -> list[int]:
         job_ids: list[int] = []
