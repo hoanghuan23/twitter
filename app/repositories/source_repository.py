@@ -46,7 +46,6 @@ class TwitterSourceRepository:
             data["max_days_old"] = 1
 
         source = TwitterSource(
-            account_username=data["account_username"],
             source_type=data["source_type"],
             topic_id=data.get("topic_id"),
             twitter_id=data.get("twitter_id"),
@@ -73,7 +72,6 @@ class TwitterSourceRepository:
         if twitter_id:
             stmt = (
                 select(TwitterSource)
-                .where(TwitterSource.account_username == data["account_username"])
                 .where(TwitterSource.twitter_id == str(twitter_id))
                 .where(TwitterSource.source_type == data["source_type"])
                 .limit(1)
@@ -84,7 +82,6 @@ class TwitterSourceRepository:
         if data["source_type"] != "account" and source_name:
             stmt = (
                 select(TwitterSource)
-                .where(TwitterSource.account_username == data["account_username"])
                 .where(TwitterSource.source_name == str(source_name))
                 .where(TwitterSource.source_type == data["source_type"])
                 .limit(1)

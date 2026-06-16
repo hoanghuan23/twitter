@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -10,9 +10,9 @@ from app.database import Base
 
 class TwitterSource(Base):
     __tablename__ = "twitter_sources"
+    __table_args__ = (UniqueConstraint("twitter_id", "source_type"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    account_username: Mapped[str] = mapped_column(ForeignKey("accounts.username"), nullable=False)
     source_type: Mapped[str] = mapped_column(String(10), nullable=False)
     topic_id: Mapped[int | None] = mapped_column(ForeignKey("topics.id"))
     twitter_id: Mapped[str | None] = mapped_column(String(50))
@@ -37,7 +37,6 @@ class TwitterSource(Base):
     protected: Mapped[bool | None] = mapped_column(Boolean, default=False)
     verified: Mapped[bool | None] = mapped_column(Boolean, default=False)
 
-    account = relationship("Account", back_populates="sources")
     topic = relationship("Topic", back_populates="sources")
     tweets = relationship("Tweet", back_populates="source")
     jobs = relationship("TwitterPipelineJob", back_populates="source")

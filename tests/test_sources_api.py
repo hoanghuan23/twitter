@@ -7,7 +7,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.crawler.twscrape_client import TwscrapeClient
-from app.models.account import Account
 from app.models.topic import Topic
 from app.models.twitter_source import TwitterSource
 from app.utils.time import utc_now
@@ -42,7 +41,6 @@ def test_create_list_get_and_delete_source(
 
     monkeypatch.setattr(TwscrapeClient, "get_user_by_login", fake_get_user_by_login)
 
-    db_session.add(Account(username="crawler"))
     db_session.add(Topic(id=1, slug="sports", display_name="Sports"))
     db_session.commit()
 
@@ -57,7 +55,7 @@ def test_create_list_get_and_delete_source(
     assert create_response.status_code == 201
     source = create_response.json()
     assert source["id"] == 1
-    assert source["account_username"] == "crawler"
+    assert "account_username" not in source
     assert source["is_active"] is True
     assert source["topic_id"] == 1
     assert source["twitter_id"] == "12345"
@@ -103,9 +101,6 @@ def test_create_source_rejects_unknown_username(
 
     monkeypatch.setattr(TwscrapeClient, "get_user_by_login", fake_get_user_by_login)
 
-    db_session.add(Account(username="crawler"))
-    db_session.commit()
-
     response = client.post(
         "/sources",
         json={
@@ -119,12 +114,16 @@ def test_create_source_rejects_unknown_username(
     assert db_session.query(TwitterSource).count() == 0
 
 
-def test_create_source_reports_unknown_crawler_account(
+def test_create_source_ignores_deprecated_account_username(
     client: TestClient,
     db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    db_session.add(Account(username="crawler"))
-    db_session.commit()
+    async def fake_get_user_by_login(self: TwscrapeClient, username: str):
+        assert username == "elonmusk"
+        return _fake_user(username="elonmusk", id_str="999")
+
+    monkeypatch.setattr(TwscrapeClient, "get_user_by_login", fake_get_user_by_login)
 
     response = client.post(
         "/sources",
@@ -135,9 +134,9 @@ def test_create_source_reports_unknown_crawler_account(
         },
     )
 
-    assert response.status_code == 404
-    assert "Crawler account not found: elonmusk" in response.json()["detail"]
-    assert db_session.query(TwitterSource).count() == 0
+    assert response.status_code == 201
+    assert response.json()["source_name"] == "elonmusk"
+    assert db_session.query(TwitterSource).count() == 1
 
 
 def test_create_source_verified_ignores_blue(
@@ -149,9 +148,6 @@ def test_create_source_verified_ignores_blue(
         return _fake_user(verified=False, blue=True)
 
     monkeypatch.setattr(TwscrapeClient, "get_user_by_login", fake_get_user_by_login)
-
-    db_session.add(Account(username="crawler"))
-    db_session.commit()
 
     response = client.post(
         "/sources",
@@ -177,9 +173,6 @@ def test_create_source_updates_existing_account_source(
         return _fake_user(followersCount=next(followers))
 
     monkeypatch.setattr(TwscrapeClient, "get_user_by_login", fake_get_user_by_login)
-
-    db_session.add(Account(username="crawler"))
-    db_session.commit()
 
     first_response = client.post(
         "/sources",
@@ -208,10 +201,8 @@ def test_update_source_config_fields(
     db_session: Session,
 ) -> None:
     now = utc_now()
-    db_session.add(Account(username="crawler"))
     db_session.add(Topic(id=1, slug="sports", display_name="Sports"))
     source = TwitterSource(
-        account_username="crawler",
         source_type="account",
         twitter_id="12345",
         twitter_url="https://x.com/example",
@@ -256,16 +247,13 @@ def test_update_source_config_fields(
     assert source.twitter_url == "https://x.com/example"
     assert source.source_name == "example"
     assert source.twitter_id == "12345"
-    assert source.account_username == "crawler"
 
 
 def test_update_source_clears_schedule_override(
     client: TestClient,
     db_session: Session,
 ) -> None:
-    db_session.add(Account(username="crawler"))
     source = TwitterSource(
-        account_username="crawler",
         source_type="account",
         twitter_id="12345",
         twitter_url="https://x.com/example",
@@ -291,9 +279,7 @@ def test_update_source_empty_body_returns_existing_source(
     client: TestClient,
     db_session: Session,
 ) -> None:
-    db_session.add(Account(username="crawler"))
     source = TwitterSource(
-        account_username="crawler",
         source_type="account",
         twitter_id="12345",
         twitter_url="https://x.com/example",
@@ -344,9 +330,6 @@ def test_create_keyword_source_from_source_name(
     client: TestClient,
     db_session: Session,
 ) -> None:
-    db_session.add(Account(username="crawler"))
-    db_session.commit()
-
     payload = {
         "source_type": "keyword",
         "source_name": " world cup ",
@@ -379,9 +362,6 @@ def test_create_source_reports_unavailable_twscrape_account(
 
     monkeypatch.setattr(TwscrapeClient, "get_user_by_login", fake_get_user_by_login)
 
-    db_session.add(Account(username="crawler"))
-    db_session.commit()
-
     response = client.post(
         "/sources",
         json={
@@ -407,9 +387,6 @@ def test_create_source_reports_unavailable_twscrape_account_by_message(
         )
 
     monkeypatch.setattr(TwscrapeClient, "get_user_by_login", fake_get_user_by_login)
-
-    db_session.add(Account(username="crawler"))
-    db_session.commit()
 
     response = client.post(
         "/sources",

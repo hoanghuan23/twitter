@@ -27,8 +27,8 @@ class SourceCreate(BaseModel):
         min_length=1,
         max_length=255,
         description=(
-            "Optional crawler account username from the local accounts table. "
-            "Omit this to use the first active crawler account."
+            "Deprecated. Accepted for backward compatibility and ignored; "
+            "twscrape selects an available account from accounts.db."
         ),
     )
     source_type: SourceType
@@ -57,7 +57,6 @@ class SourceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    account_username: str
     source_type: str
     topic_id: int | None
     twitter_id: str | None

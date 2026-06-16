@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.crawler.twscrape_client import TwscrapeClient
 from app.models.twitter_source import TwitterSource
-from app.repositories.account_repository import AccountRepository
 from app.repositories.source_repository import TwitterSourceRepository
 from app.schemas.source import SourceCreate, SourceUpdate
 from app.services.source_tier_service import SourceTierService
@@ -30,7 +29,6 @@ class TwitterSourceService:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.repository = TwitterSourceRepository(db)
-        self.account_repository = AccountRepository(db)
         self.twscrape_client = TwscrapeClient()
         self.source_tier_service = SourceTierService(db)
 
@@ -49,18 +47,15 @@ class TwitterSourceService:
         return source
 
     async def create_source(self, payload: SourceCreate) -> TwitterSource:
-        account_username = self._resolve_account_username(payload.account_username)
         enriched_fields = await self._source_enriched_fields(payload)
-        enriched_fields["account_username"] = account_username
         source = self.repository.create(payload, enriched_fields)
         self.db.commit()
         logger.info(
             "Created source source_id=%s source_type=%s source_name=%s "
-            "account_username=%s twitter_id=%s next_scrape=%s",
+            "twitter_id=%s next_scrape=%s",
             source.id,
             source.source_type,
             source.source_name,
-            source.account_username,
             source.twitter_id,
             source.next_scrape,
         )
@@ -72,26 +67,6 @@ class TwitterSourceService:
         self.repository.update_config(source, data)
         self.db.commit()
         return source
-
-    def _resolve_account_username(self, account_username: str | None) -> str:
-        if account_username is not None:
-            account = self.account_repository.get(account_username)
-            if account is None:
-                raise HTTPException(
-                    status.HTTP_404_NOT_FOUND,
-                    "Crawler account not found: "
-                    f"{account_username}. Use an existing /accounts username, "
-                    "or omit account_username to use the first active crawler account.",
-                )
-            return account.username
-
-        account = self.account_repository.first_active()
-        if account is None:
-            raise HTTPException(
-                status.HTTP_503_SERVICE_UNAVAILABLE,
-                "No active twitter account available for source creation",
-            )
-        return account.username
 
     async def _source_enriched_fields(self, payload: SourceCreate) -> dict[str, object]:
         if payload.source_type == "account":

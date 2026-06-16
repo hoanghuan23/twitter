@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy import Engine, inspect, text
 
+
+logger = logging.getLogger(__name__)
 
 SQLITE_COLUMNS: dict[str, dict[str, str]] = {
     "tweets": {
@@ -70,6 +74,12 @@ def ensure_runtime_schema(engine: Engine) -> None:
             existing_columns = {
                 column["name"] for column in inspector.get_columns(table_name)
             }
+            if table_name == "twitter_sources" and "account_username" in existing_columns:
+                logger.warning(
+                    "SQLite table twitter_sources still has legacy account_username column. "
+                    "The app ignores this column because accounts are managed in accounts.db; "
+                    "rebuild or migrate twitter.db from data/schema_table_twitter.sql when convenient."
+                )
             for column_name, column_type in columns.items():
                 if column_name not in existing_columns:
                     connection.execute(

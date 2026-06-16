@@ -1,18 +1,17 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import HTTPException, status
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 from app.models.account import Account
 from app.repositories.account_repository import AccountRepository
-from app.schemas.account import AccountCookieUpdate, AccountCreate, AccountRead
+from app.schemas.account import AccountRead
 
 
 class AccountService:
-    def __init__(self, db: Session) -> None:
-        self.db = db
-        self.repository = AccountRepository(db)
+    def __init__(self, repository: AccountRepository | None = None) -> None:
+        self.repository = repository or AccountRepository()
 
     def list_accounts(
         self,
@@ -25,35 +24,6 @@ class AccountService:
 
     def get_account(self, username: str) -> AccountRead:
         return self.to_read(self._get_account(username))
-
-
-    async def create_account(self, payload: AccountCreate) -> AccountRead:
-        try:
-            account = self.repository.create(payload)
-            self.db.commit()
-            return self.to_read(account)
-        except IntegrityError as exc:
-            self.db.rollback()
-            raise HTTPException(
-                status.HTTP_409_CONFLICT,
-                "Account username already exists",
-            ) from exc
-
-    def update_account_cookies(
-        self,
-        username: str,
-        payload: AccountCookieUpdate,
-    ) -> AccountRead:
-        account = self._get_account(username)
-        account = self.repository.update_cookies(account, payload)
-        self.db.commit()
-        return self.to_read(account)
-
-    def deactivate_account(self, username: str) -> bool:
-        account = self._get_account(username)
-        self.repository.deactivate(account)
-        self.db.commit()
-        return True
 
     def _get_account(self, username: str) -> Account:
         account = self.repository.get(username)
@@ -69,10 +39,18 @@ class AccountService:
             active=account.active,
             proxy=account.proxy,
             error_msg=account.error_msg,
-            last_used=account.last_used,
+            last_used=self._parse_last_used(account.last_used),
             has_password=bool(account.password),
             has_email_password=bool(account.email_password),
             has_headers=bool(account.headers and account.headers != "{}"),
             has_cookies=bool(account.cookies and account.cookies != "{}"),
             has_mfa_code=bool(account.mfa_code),
         )
+
+    def _parse_last_used(self, value: str | None) -> datetime | None:
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None

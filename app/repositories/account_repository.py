@@ -1,64 +1,65 @@
 from __future__ import annotations
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+import os
+import sqlite3
+from pathlib import Path
 
-from app.models.account import DEFAULT_ACCOUNT_STATS, DEFAULT_USER_AGENT, Account
-from app.schemas.account import AccountCookieUpdate, AccountCreate
+from app.config import settings
+from app.models.account import Account
 
 
 class AccountRepository:
-    def __init__(self, db: Session) -> None:
-        self.db = db
+    def __init__(self, db_path: str | None = None) -> None:
+        self.db_path = db_path or os.getenv("TWSCRAPE_DB_PATH", settings.twscrape_db_path)
 
     def list(self, active: bool | None, limit: int, offset: int) -> list[Account]:
-        stmt = select(Account)
+        if not Path(self.db_path).exists():
+            return []
+
+        query = "SELECT * FROM accounts"
+        params: list[object] = []
         if active is not None:
-            stmt = stmt.where(Account.active == active)
-        stmt = stmt.order_by(Account.username.asc()).limit(limit).offset(offset)
-        return list(self.db.scalars(stmt))
+            query += " WHERE active = ?"
+            params.append(1 if active else 0)
+        query += " ORDER BY username ASC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        with self._connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [self._to_account(row) for row in rows]
 
     def get(self, username: str) -> Account | None:
-        return self.db.get(Account, username)
+        if not Path(self.db_path).exists():
+            return None
 
-    def first_active(self) -> Account | None:
-        stmt = (
-            select(Account)
-            .where(Account.active == True)  # noqa: E712
-            .order_by(Account.username.asc())
-            .limit(1)
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM accounts WHERE username = ? COLLATE NOCASE LIMIT 1",
+                (username,),
+            ).fetchone()
+        return self._to_account(row) if row is not None else None
+
+    def _connect(self) -> sqlite3.Connection:
+        connection = sqlite3.connect(self.db_path)
+        connection.row_factory = sqlite3.Row
+        return connection
+
+    def _to_account(self, row: sqlite3.Row) -> Account:
+        data = dict(row)
+        return Account(
+            username=data["username"],
+            password=data.get("password") or "",
+            email=data.get("email") or "",
+            email_password=data.get("email_password") or "",
+            user_agent=data.get("user_agent") or "",
+            active=bool(data.get("active")),
+            locks=data.get("locks") or "{}",
+            headers=data.get("headers") or "{}",
+            cookies=data.get("cookies") or "{}",
+            proxy=data.get("proxy"),
+            error_msg=data.get("error_msg"),
+            stats=data.get("stats") or "{}",
+            last_used=data.get("last_used"),
+            _tx=data.get("_tx"),
+            mfa_code=data.get("mfa_code"),
         )
-        return self.db.scalar(stmt)
-
-    def create(self, payload: AccountCreate) -> Account:
-        account = Account(
-            username=payload.username,
-            password=payload.password or "",
-            email=payload.email or "",
-            email_password=payload.email_password or "",
-            user_agent=payload.user_agent or DEFAULT_USER_AGENT,
-            active=payload.active,
-            locks=payload.locks or "{}",
-            headers=payload.headers or "{}",
-            cookies=payload.cookies or "{}",
-            proxy=payload.proxy,
-            stats=DEFAULT_ACCOUNT_STATS,
-            mfa_code=payload.mfa_code,
-        )
-        self.db.add(account)
-        self.db.flush()
-        return account
-
-    def deactivate(self, account: Account) -> Account:
-        account.active = False
-        self.db.flush()
-        return account
-
-    def update_cookies(
-        self,
-        account: Account,
-        payload: AccountCookieUpdate,
-    ) -> Account:
-        account.cookies = payload.cookies or "{}"
-        self.db.flush()
-        return account

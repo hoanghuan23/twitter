@@ -1,90 +1,138 @@
 from __future__ import annotations
 
-import json
+import sqlite3
 
+import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-
-from app.models.account import Account
 
 
-def test_create_list_get_and_deactivate_account(
+def _create_accounts_db(path: str) -> None:
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE accounts (
+                username TEXT PRIMARY KEY NOT NULL COLLATE NOCASE,
+                password TEXT NOT NULL,
+                email TEXT NOT NULL COLLATE NOCASE,
+                email_password TEXT NOT NULL,
+                user_agent TEXT NOT NULL,
+                active BOOLEAN DEFAULT FALSE NOT NULL,
+                locks TEXT DEFAULT '{}' NOT NULL,
+                headers TEXT DEFAULT '{}' NOT NULL,
+                cookies TEXT DEFAULT '{}' NOT NULL,
+                proxy TEXT DEFAULT NULL,
+                error_msg TEXT DEFAULT NULL,
+                stats TEXT DEFAULT '{}' NOT NULL,
+                last_used TEXT DEFAULT NULL,
+                _tx TEXT DEFAULT NULL,
+                mfa_code TEXT DEFAULT NULL
+            )
+            """
+        )
+        connection.executemany(
+            """
+            INSERT INTO accounts (
+                username, password, email, email_password, user_agent, active,
+                locks, headers, cookies, proxy, error_msg, stats, last_used, _tx, mfa_code
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    "crawler",
+                    "password",
+                    "crawler@example.com",
+                    "email-password",
+                    "Mozilla/5.0",
+                    1,
+                    "{}",
+                    '{"x-csrf-token": "secret-ct0"}',
+                    '{"auth_token": "secret-token"}',
+                    None,
+                    None,
+                    "{}",
+                    "2026-06-16T00:00:00",
+                    None,
+                    "123456",
+                ),
+                (
+                    "inactive",
+                    "",
+                    "",
+                    "",
+                    "Mozilla/5.0",
+                    0,
+                    "{}",
+                    "{}",
+                    "{}",
+                    None,
+                    "disabled",
+                    "{}",
+                    None,
+                    None,
+                    None,
+                ),
+            ],
+        )
+
+
+def test_list_and_get_accounts_read_from_twscrape_db(
     client: TestClient,
-    db_session: Session,
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    response = client.post(
-        "/accounts",
-        json={
-            "username": "crawler",
-            "user_agent": "Mozilla/5.0",
-            "cookies": {"auth_token": "secret-token", "ct0": "secret-ct0"},
-            "headers": {"x-csrf-token": "secret-ct0"},
-        },
-    )
-
-    assert response.status_code == 201
-    body = response.json()
-    assert body["username"] == "crawler"
-    assert body["has_cookies"] is True
-    assert body["has_headers"] is True
-    assert "user_id" not in body
-    assert "cookies" not in body
-    assert "headers" not in body
-
-    account = db_session.get(Account, "crawler")
-    assert account is not None
-    assert json.loads(account.cookies)["auth_token"] == "secret-token"
-    assert json.loads(account.stats) == {}
+    accounts_db = tmp_path / "accounts.db"
+    _create_accounts_db(str(accounts_db))
+    monkeypatch.setenv("TWSCRAPE_DB_PATH", str(accounts_db))
 
     list_response = client.get("/accounts")
     assert list_response.status_code == 200
-    assert len(list_response.json()) == 1
-    assert "cookies" not in list_response.json()[0]
-
-    get_response = client.get("/accounts/crawler")
-    assert get_response.status_code == 200
-    assert get_response.json()["has_cookies"] is True
-
-    delete_response = client.delete("/accounts/crawler")
-    assert delete_response.status_code == 200
-    assert delete_response.json() == {"deleted": True}
+    accounts = list_response.json()
+    assert [account["username"] for account in accounts] == ["crawler", "inactive"]
+    assert "cookies" not in accounts[0]
+    assert accounts[0]["has_password"] is True
+    assert accounts[0]["has_email_password"] is True
+    assert accounts[0]["has_headers"] is True
+    assert accounts[0]["has_cookies"] is True
+    assert accounts[0]["has_mfa_code"] is True
 
     active_response = client.get("/accounts", params={"active": True})
     assert active_response.status_code == 200
-    assert active_response.json() == []
+    assert [account["username"] for account in active_response.json()] == ["crawler"]
+
+    get_response = client.get("/accounts/crawler")
+    assert get_response.status_code == 200
+    assert get_response.json()["email"] == "crawler@example.com"
 
 
-def test_update_account_cookies(
+def test_get_account_not_found_when_missing_from_twscrape_db(
     client: TestClient,
-    db_session: Session,
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    db_session.add(Account(username="crawler", cookies="{}"))
-    db_session.commit()
+    accounts_db = tmp_path / "accounts.db"
+    _create_accounts_db(str(accounts_db))
+    monkeypatch.setenv("TWSCRAPE_DB_PATH", str(accounts_db))
 
-    response = client.patch(
-        "/accounts/crawler",
-        json={"cookies": {"auth_token": "new-token", "ct0": "new-ct0"}},
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["username"] == "crawler"
-    assert body["has_cookies"] is True
-    assert "cookies" not in body
-
-    account = db_session.get(Account, "crawler")
-    assert account is not None
-    assert json.loads(account.cookies) == {
-        "auth_token": "new-token",
-        "ct0": "new-ct0",
-    }
-
-
-def test_update_account_cookies_not_found(client: TestClient) -> None:
-    response = client.patch(
-        "/accounts/missing",
-        json={"cookies": {"auth_token": "new-token"}},
-    )
+    response = client.get("/accounts/missing")
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Account not found"
+
+
+def test_account_write_endpoints_are_disabled(
+    client: TestClient,
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    accounts_db = tmp_path / "accounts.db"
+    _create_accounts_db(str(accounts_db))
+    monkeypatch.setenv("TWSCRAPE_DB_PATH", str(accounts_db))
+
+    create_response = client.post("/accounts", json={"username": "new"})
+    patch_response = client.patch("/accounts/crawler", json={"cookies": {}})
+    delete_response = client.delete("/accounts/crawler")
+
+    assert create_response.status_code == 405
+    assert patch_response.status_code == 405
+    assert delete_response.status_code == 405

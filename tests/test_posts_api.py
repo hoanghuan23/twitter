@@ -6,7 +6,6 @@ from datetime import timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.models.account import Account
 from app.models.tweet import Tweet
 from app.models.tweet_metric import TweetMetric
 from app.models.twitter_source import TwitterSource
@@ -15,10 +14,8 @@ from app.utils.time import utc_now
 
 def test_list_latest_and_get_posts(client: TestClient, db_session: Session) -> None:
     now = utc_now()
-    db_session.add(Account(username="crawler"))
     source = TwitterSource(
         id=1,
-        account_username="crawler",
         source_type="account",
         twitter_id="12345",
         twitter_url="https://x.com/example",

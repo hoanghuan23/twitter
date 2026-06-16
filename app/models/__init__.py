@@ -1,4 +1,3 @@
-from app.models.account import Account
 from app.models.pipeline_job import TwitterPipelineJob
 from app.models.pipeline_log import TwitterPipelineLog
 from app.models.topic import Topic
@@ -8,7 +7,6 @@ from app.models.twitter_analytics_cache import TwitterAnalyticsCache
 from app.models.twitter_source import TwitterSource
 
 __all__ = [
-    "Account",
     "TwitterPipelineJob",
     "TwitterPipelineLog",
     "Topic",

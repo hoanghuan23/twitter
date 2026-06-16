@@ -7,7 +7,6 @@ from datetime import timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.account import Account
 from app.models.pipeline_log import TwitterPipelineLog
 from app.models.tweet import Tweet
 from app.models.tweet_metric import TweetMetric
@@ -55,10 +54,8 @@ def test_update_due_tweet_metrics_creates_update_job_and_refreshes_tiers(
     caplog,
 ) -> None:
     now = utc_now()
-    db_session.add(Account(username="crawler"))
     source = TwitterSource(
         id=1,
-        account_username="crawler",
         source_type="account",
         twitter_id="12345",
         twitter_url="https://x.com/example",
@@ -128,10 +125,8 @@ def test_update_due_tweet_metrics_fetches_all_details_before_writing_metrics(
     db_session: Session,
 ) -> None:
     now = utc_now()
-    db_session.add(Account(username="crawler"))
     source = TwitterSource(
         id=1,
-        account_username="crawler",
         source_type="account",
         twitter_id="12345",
         twitter_url="https://x.com/example",
@@ -194,10 +189,8 @@ def test_update_due_tweet_metrics_marks_job_failed_when_fetch_raises(
     db_session: Session,
 ) -> None:
     now = utc_now()
-    db_session.add(Account(username="crawler"))
     source = TwitterSource(
         id=1,
-        account_username="crawler",
         source_type="account",
         twitter_id="12345",
         twitter_url="https://x.com/example",
@@ -241,11 +234,9 @@ def test_update_due_tweet_metrics_processes_one_source_per_job(
     db_session: Session,
 ) -> None:
     now = utc_now()
-    db_session.add(Account(username="crawler"))
     sources = [
         TwitterSource(
             id=source_id,
-            account_username="crawler",
             source_type="account",
             twitter_id=str(source_id),
             twitter_url=f"https://x.com/example{source_id}",
@@ -302,10 +293,8 @@ def test_update_due_tweet_metrics_expires_old_tweets_without_fetching_details(
     db_session: Session,
 ) -> None:
     now = utc_now()
-    db_session.add(Account(username="crawler"))
     source = TwitterSource(
         id=1,
-        account_username="crawler",
         source_type="account",
         twitter_id="12345",
         twitter_url="https://x.com/example",

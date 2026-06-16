@@ -4,7 +4,6 @@ from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
-from app.models.account import Account
 from app.models.tweet import Tweet
 from app.models.twitter_source import TwitterSource
 from app.repositories.post_repository import TwitterPostRepository
@@ -12,11 +11,9 @@ from app.utils.time import utc_now
 
 
 def test_post_upsert_is_idempotent_by_tweet_id(db_session: Session) -> None:
-    db_session.add(Account(username="crawler"))
     db_session.add(
         TwitterSource(
             id=1,
-            account_username="crawler",
             source_type="account",
             twitter_id="12345",
             twitter_url="https://x.com/example",
@@ -46,11 +43,9 @@ def test_post_upsert_is_idempotent_by_tweet_id(db_session: Session) -> None:
 
 def test_due_metric_update_skips_expired_and_untracked(db_session: Session) -> None:
     now = utc_now()
-    db_session.add(Account(username="crawler"))
     db_session.add(
         TwitterSource(
             id=1,
-            account_username="crawler",
             source_type="account",
             twitter_id="12345",
             twitter_url="https://x.com/example",
@@ -113,11 +108,9 @@ def test_expire_metric_tracking_older_than_marks_tracked_old_tweets(
     db_session: Session,
 ) -> None:
     now = utc_now()
-    db_session.add(Account(username="crawler"))
     db_session.add(
         TwitterSource(
             id=1,
-            account_username="crawler",
             source_type="account",
             twitter_id="12345",
             twitter_url="https://x.com/example",

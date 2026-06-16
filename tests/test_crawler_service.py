@@ -7,7 +7,6 @@ from datetime import timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.account import Account
 from app.models.tweet import Tweet
 from app.models.tweet_metric import TweetMetric
 from app.models.twitter_analytics_cache import TwitterAnalyticsCache
@@ -83,11 +82,9 @@ def test_crawler_service_persists_tweets_metrics_and_job(
     db_session: Session,
     caplog,
 ) -> None:
-    db_session.add(Account(username="crawler"))
     db_session.add(
         TwitterSource(
             id=1,
-            account_username="crawler",
             source_type="account",
             twitter_id="12345",
             twitter_url="https://x.com/example",
@@ -102,7 +99,7 @@ def test_crawler_service_persists_tweets_metrics_and_job(
     job = asyncio.run(service.crawl_source(1))
 
     assert job.status == "done"
-    assert job.session_username == "crawler"
+    assert job.session_username is None
     assert job.tweets_found == 1
     assert job.tweets_new == 1
 
@@ -150,11 +147,9 @@ def test_crawler_service_skips_existing_tweet_metrics_before_due_time(
     db_session: Session,
 ) -> None:
     now = utc_now()
-    db_session.add(Account(username="crawler"))
     db_session.add(
         TwitterSource(
             id=1,
-            account_username="crawler",
             source_type="account",
             twitter_id="12345",
             twitter_url="https://x.com/example",
@@ -213,11 +208,9 @@ def test_crawler_service_stops_after_two_consecutive_old_posts(
     db_session: Session,
 ) -> None:
     now = utc_now()
-    db_session.add(Account(username="crawler"))
     db_session.add(
         TwitterSource(
             id=1,
-            account_username="crawler",
             source_type="account",
             twitter_id="12345",
             twitter_url="https://x.com/example",
