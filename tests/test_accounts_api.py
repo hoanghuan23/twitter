@@ -120,19 +120,8 @@ def test_get_account_not_found_when_missing_from_twscrape_db(
     assert response.json()["detail"] == "Account not found"
 
 
-def test_account_write_endpoints_are_disabled(
-    client: TestClient,
-    tmp_path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    accounts_db = tmp_path / "accounts.db"
-    _create_accounts_db(str(accounts_db))
-    monkeypatch.setenv("TWSCRAPE_DB_PATH", str(accounts_db))
+def test_account_write_endpoints_are_removed_from_openapi(client: TestClient) -> None:
+    paths = client.get("/openapi.json").json()["paths"]
 
-    create_response = client.post("/accounts", json={"username": "new"})
-    patch_response = client.patch("/accounts/crawler", json={"cookies": {}})
-    delete_response = client.delete("/accounts/crawler")
-
-    assert create_response.status_code == 405
-    assert patch_response.status_code == 405
-    assert delete_response.status_code == 405
+    assert set(paths["/accounts"].keys()) == {"get"}
+    assert set(paths["/accounts/{username}"].keys()) == {"get"}
