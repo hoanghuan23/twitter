@@ -59,8 +59,7 @@ Accounts:
 
 - `GET /accounts`
 - `GET /accounts/{user_id}`
-- `POST /accounts`
-- `DELETE /accounts/{user_id}`
+- write operations are disabled; manage accounts with `twscrape`
 
 Sources:
 
@@ -84,7 +83,13 @@ Jobs:
 
 ## twscrape Accounts
 
-The existing schema uses `accounts.user_id` as `twitter_sources.user_id`. Add and log in accounts with `twscrape` before running real crawl jobs. The app does not implement authentication in this MVP.
+Twitter accounts are managed separately by `twscrape` in `data/accounts.db` by default. Override that path with:
+
+```bash
+set TWSCRAPE_DB_PATH=./data/accounts.db
+```
+
+Add and log in accounts with `twscrape` before running real crawl jobs. The app reads `/accounts` from `accounts.db` for visibility only; it does not create, update, delete, authenticate, or select crawler accounts itself. Source creation accepts a legacy `account_username` field for old clients, but ignores it because `twscrape` chooses an available account internally.
 
 ## Tests
 
