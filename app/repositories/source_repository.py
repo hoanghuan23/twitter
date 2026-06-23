@@ -123,3 +123,10 @@ class TwitterSourceRepository:
             .limit(limit)
         )
         return list(self.db.scalars(stmt))
+
+    def defer_due_sources(self, now: datetime, retry_at: datetime) -> int:
+        sources = self.due_sources(now, limit=100_000)
+        for source in sources:
+            source.next_scrape = retry_at
+        self.db.flush()
+        return len(sources)

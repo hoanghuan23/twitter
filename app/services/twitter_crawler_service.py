@@ -18,7 +18,14 @@ from app.services.metric_tier_service import TweetMetricTierService
 from app.services.source_tier_service import SourceTierService
 from app.services.twitter_analytics_service import TwitterAnalyticsService
 from app.services.twitter_source_service import TwitterSourceService
+from app.services.account_quota_service import AccountQuotaService
 from app.utils.time import utc_now
+
+try:
+    from twscrape.accounts_pool import NoAccountError
+except ImportError:
+    class NoAccountError(Exception):
+        pass
 
 
 logger = logging.getLogger(__name__)
@@ -40,6 +47,7 @@ class TwitterCrawlerService:
         self.metric_tier_service = TweetMetricTierService()
         self.source_tier_service = SourceTierService(db)
         self.analytics_service = TwitterAnalyticsService(db)
+        self.account_quota_service = AccountQuotaService()
 
     async def crawl_source(self, source_id: int, limit: int | None = None) -> TwitterPipelineJob:
         source = self.source_repository.get(source_id)
@@ -68,6 +76,15 @@ class TwitterCrawlerService:
         items_updated = 0
         tweets_recent_24h_found = 0
         tweets_recent_24h_saved = 0
+        availability = self.account_quota_service.availability("UserTweets")
+        if not availability.available:
+            return self._defer_no_account_job(
+                job.id,
+                source.id,
+                availability.retry_at,
+                "No twscrape account available for queue UserTweets",
+            )
+
         try:
             affected_dates: set[date] = set()
             latest_posted_at = self.post_repository.latest_posted_at_for_source(source.id)
@@ -128,6 +145,13 @@ class TwitterCrawlerService:
             )
             self.db.commit()
             return job
+        except NoAccountError as exc:
+            return self._defer_no_account_job(
+                job.id,
+                source.id,
+                self.account_quota_service.retry_at("UserTweets"),
+                str(exc) or "No twscrape account available for queue UserTweets",
+            )
         except Exception as exc:
             self.db.rollback()
             error_message = str(exc)
@@ -152,3 +176,35 @@ class TwitterCrawlerService:
             )
             self.db.commit()
             return job
+
+    def _defer_no_account_job(
+        self,
+        job_id: int,
+        source_id: int,
+        retry_at,
+        detail: str,
+    ) -> TwitterPipelineJob:
+        self.db.rollback()
+        job = self.job_repository.get(job_id)
+        source = self.source_repository.get(source_id)
+        if job is None or source is None:
+            raise RuntimeError("Crawl job or source disappeared while deferring")
+
+        source.next_scrape = retry_at
+        message = f"{detail}; deferred until {retry_at.isoformat()}"
+        self.job_repository.mark_deferred(job, message)
+        self.job_repository.log(
+            job_id=job.id,
+            source_id=source.id,
+            level="WARNING",
+            message=message,
+            error_type="NoAccountError",
+        )
+        logger.warning(
+            "Source scrape deferred job_id=%s source_id=%s queue=UserTweets retry_at=%s",
+            job.id,
+            source.id,
+            retry_at,
+        )
+        self.db.commit()
+        return job

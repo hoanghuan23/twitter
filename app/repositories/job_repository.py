@@ -68,6 +68,13 @@ class TwitterPipelineJobRepository:
         self.db.flush()
         return job
 
+    def mark_deferred(self, job: TwitterPipelineJob, message: str) -> TwitterPipelineJob:
+        job.status = "deferred"
+        job.error_message = message
+        job.finished_at = utc_now()
+        self.db.flush()
+        return job
+
     def log(
         self,
         job_id: int | None,

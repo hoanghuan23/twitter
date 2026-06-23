@@ -23,7 +23,13 @@ class Settings:
         os.getenv("TWITTER_DEFAULT_SCRAPE_INTERVAL_MINUTES", "60")
     )
     default_crawl_limit: int = int(os.getenv("TWITTER_DEFAULT_CRAWL_LIMIT", "50")) # use for source_type = (hashtag/keyword)
-    account_crawl_limit: int = int(os.getenv("TWITTER_ACCOUNT_CRAWL_LIMIT", "500")) # user for source_type = account
+    account_crawl_limit: int = int(os.getenv("TWITTER_ACCOUNT_CRAWL_LIMIT", "100")) # use for source_type = account
+    no_account_retry_fallback_minutes: int = int(
+        os.getenv("TWITTER_NO_ACCOUNT_RETRY_FALLBACK_MINUTES", "15")
+    )
+    no_account_unlock_buffer_seconds: int = int(
+        os.getenv("TWITTER_NO_ACCOUNT_UNLOCK_BUFFER_SECONDS", "60")
+    )
 
 
 settings = Settings()

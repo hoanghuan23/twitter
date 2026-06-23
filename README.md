@@ -44,14 +44,14 @@ GET /health
 
 ## Scheduler
 
-The scheduler is disabled by default for local safety. Enable it with:
+The scheduler is enabled by default. Disable it for local work with:
 
 ```bash
-set TWITTER_SCHEDULER_ENABLED=1
-uvicorn app.main:app --reload
+set TWITTER_SCHEDULER_ENABLED=0
 ```
 
-It checks due sources every 5 minutes by default.
+It checks due sources every 120 seconds by default. Configure this with
+`TWITTER_SCHEDULER_INTERVAL_SECONDS`.
 
 ## API
 
@@ -90,6 +90,14 @@ set TWSCRAPE_DB_PATH=./data/accounts.db
 ```
 
 Add and log in accounts with `twscrape` before running real crawl jobs. The app reads `/accounts` from `accounts.db` for visibility only; it does not create, update, delete, authenticate, or select crawler accounts itself. Source creation accepts a legacy `account_username` field for old clients, but ignores it because `twscrape` chooses an available account internally.
+
+When every account is locked for a twscrape queue, crawl and metric jobs are marked
+`deferred` rather than `failed`. The app reads the earliest queue unlock from
+`accounts.db`, adds a 60-second buffer, and retries then. If no usable lock is
+available, it uses `TWITTER_NO_ACCOUNT_RETRY_FALLBACK_MINUTES` (15 by default).
+Set `TWITTER_NO_ACCOUNT_UNLOCK_BUFFER_SECONDS` to tune the buffer.
+Timeline crawls fetch at most 100 tweets by default; set
+`TWITTER_ACCOUNT_CRAWL_LIMIT` for a different per-crawl cap.
 
 ## Tests
 

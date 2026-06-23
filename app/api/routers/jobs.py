@@ -9,6 +9,7 @@ from app.repositories.job_repository import TwitterPipelineJobRepository
 from app.schemas.job import CrawlDueResponse, JobRead
 from app.services.twitter_crawler_service import TwitterCrawlerService
 from app.services.twitter_source_service import TwitterSourceService
+from app.utils.time import utc_now
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -38,6 +39,13 @@ async def crawl_due_sources(db: Session = Depends(get_db)) -> CrawlDueResponse:
     for source in sources:
         job = await TwitterCrawlerService(db).crawl_source(source.id)
         job_ids.append(job.id)
+        if job.status == "deferred":
+            deferred_source = TwitterSourceService(db).repository.get(source.id)
+            retry_at = deferred_source.next_scrape if deferred_source else None
+            if retry_at is not None:
+                TwitterSourceService(db).repository.defer_due_sources(utc_now(), retry_at)
+                db.commit()
+            break
     return CrawlDueResponse(jobs_started=len(job_ids), job_ids=job_ids)
 
 

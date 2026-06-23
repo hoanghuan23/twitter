@@ -218,7 +218,7 @@ CREATE TABLE twitter_pipeline_jobs (
         session_username TEXT,   -- plain text, no FK (accounts in separate db)
 
         status          VARCHAR(10) NOT NULL DEFAULT 'pending'
-                        CHECK (status IN ('pending', 'running', 'done', 'failed')),
+                        CHECK (status IN ('pending', 'running', 'done', 'failed', 'deferred')),
 
         tweets_found    INTEGER NOT NULL DEFAULT 0,
         tweets_new      INTEGER NOT NULL DEFAULT 0,

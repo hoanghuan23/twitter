@@ -20,7 +20,14 @@ from app.scheduler_rules import tweet_metric_rules
 from app.services.metric_tier_service import TweetMetricTierService
 from app.services.source_tier_service import SourceTierService
 from app.services.twitter_analytics_service import TwitterAnalyticsService
+from app.services.account_quota_service import AccountQuotaService
 from app.utils.time import utc_now
+
+try:
+    from twscrape.accounts_pool import NoAccountError
+except ImportError:
+    class NoAccountError(Exception):
+        pass
 
 
 logger = logging.getLogger(__name__)
@@ -55,6 +62,7 @@ class TweetMetricUpdateService:
         self.metric_tier_service = TweetMetricTierService()
         self.source_tier_service = SourceTierService(db)
         self.analytics_service = TwitterAnalyticsService(db)
+        self.account_quota_service = AccountQuotaService()
 
     async def update_due_tweet_metrics(self, limit: int) -> TwitterPipelineJob | None:
         async with _metric_update_lock:
@@ -98,8 +106,26 @@ class TweetMetricUpdateService:
             limit,
         )
 
+        availability = self.account_quota_service.availability("TweetDetail", now)
+        if not availability.available:
+            return self._defer_no_account_job(
+                job.id,
+                now,
+                cutoff,
+                availability.retry_at,
+                "No twscrape account available for queue TweetDetail",
+            )
+
         try:
             detail_results = await self._fetch_tweet_details(due_tweet_refs)
+        except NoAccountError as exc:
+            return self._defer_no_account_job(
+                job.id,
+                now,
+                cutoff,
+                self.account_quota_service.retry_at("TweetDetail"),
+                str(exc) or "No twscrape account available for queue TweetDetail",
+            )
         except Exception as exc:
             return self._mark_job_failed(job.id, exc)
 
@@ -238,6 +264,37 @@ class TweetMetricUpdateService:
             message=error_message,
             error_type=exc.__class__.__name__,
             error_details=traceback.format_exc(),
+        )
+        self.db.commit()
+        return job
+
+    def _defer_no_account_job(
+        self,
+        job_id: int,
+        now,
+        cutoff,
+        retry_at,
+        detail: str,
+    ) -> TwitterPipelineJob:
+        self.db.rollback()
+        job = self.job_repository.get(job_id)
+        if job is None:
+            raise RuntimeError(f"Metric update job not found while deferring: {job_id}")
+        deferred_count = self.post_repository.defer_due_metric_updates(now, cutoff, retry_at)
+        message = f"{detail}; deferred until {retry_at.isoformat()}"
+        self.job_repository.mark_deferred(job, message)
+        self.job_repository.log(
+            job_id=job.id,
+            source_id=job.source_id,
+            level="WARNING",
+            message=message,
+            error_type="NoAccountError",
+        )
+        logger.warning(
+            "Metric update deferred job_id=%s queue=TweetDetail retry_at=%s deferred_tweets=%s",
+            job.id,
+            retry_at,
+            deferred_count,
         )
         self.db.commit()
         return job

@@ -8,6 +8,7 @@ from app.database import SessionLocal
 from app.services.tweet_metric_update_service import TweetMetricUpdateService
 from app.services.twitter_crawler_service import TwitterCrawlerService
 from app.services.twitter_source_service import TwitterSourceService
+from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,21 @@ class SchedulerService:
                 )
                 if job.status == "failed":
                     logger.warning("Crawl job %s failed: %s", job.id, job.error_message)
+                if job.status == "deferred":
+                    deferred_source = source_service.repository.get(source.id)
+                    retry_at = deferred_source.next_scrape if deferred_source else None
+                    if retry_at is not None:
+                        deferred_count = source_service.repository.defer_due_sources(
+                            now=utc_now(),
+                            retry_at=retry_at,
+                        )
+                        db.commit()
+                        logger.warning(
+                            "Crawl queue deferred until %s; postponed due sources count=%s",
+                            retry_at,
+                            deferred_count,
+                        )
+                    break
         return job_ids
 
     async def update_due_tweet_metrics(self) -> int:

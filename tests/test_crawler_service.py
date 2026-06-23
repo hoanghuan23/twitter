@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 from app.models.tweet import Tweet
 from app.models.tweet_metric import TweetMetric
 from app.models.twitter_analytics_cache import TwitterAnalyticsCache
+from app.models.pipeline_log import TwitterPipelineLog
 from app.models.twitter_source import TwitterSource
 from app.services.twitter_crawler_service import TwitterCrawlerService
+from app.services.twitter_crawler_service import NoAccountError
 from app.utils.time import utc_now
 
 
@@ -33,6 +35,12 @@ def _raw_tweet(tweet_id: str, content: str, posted_at, likes: int = 7) -> dict:
 class FakeTwscrapeClient:
     async def crawl_source(self, source: TwitterSource, limit: int | None = None):
         yield _raw_tweet("tweet-1", "hello", utc_now())
+
+
+class NoAccountCrawlerClient:
+    async def crawl_source(self, source: TwitterSource, limit: int | None = None):
+        raise NoAccountError("No account available for queue UserTweets")
+        yield  # pragma: no cover
 
 
 class ExistingTweetNotDueClient:
@@ -141,6 +149,32 @@ def test_crawler_service_persists_tweets_metrics_and_job(
     assert "source_id=1" in log_messages
     assert "tweets_found=1" in log_messages
     assert "tweets_new=1" in log_messages
+
+
+def test_crawler_defers_when_twscrape_has_no_account(db_session: Session) -> None:
+    now = utc_now()
+    source = TwitterSource(
+        id=1,
+        source_type="account",
+        twitter_id="12345",
+        twitter_url="https://x.com/example",
+        is_active=True,
+        created_at=now,
+        next_scrape=now,
+    )
+    db_session.add(source)
+    db_session.commit()
+
+    job = asyncio.run(
+        TwitterCrawlerService(db_session, client=NoAccountCrawlerClient()).crawl_source(1)
+    )
+
+    assert job.status == "deferred"
+    assert "UserTweets" in (job.error_message or "")
+    assert db_session.get(TwitterSource, 1).next_scrape > now  # type: ignore[union-attr]
+    log = db_session.scalar(select(TwitterPipelineLog).where(TwitterPipelineLog.job_id == job.id))
+    assert log is not None
+    assert log.log_level == "WARNING"
 
 
 def test_crawler_service_skips_existing_tweet_metrics_before_due_time(

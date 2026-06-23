@@ -27,6 +27,8 @@ def ensure_runtime_schema(engine: Engine) -> None:
 
     inspector = inspect(engine)
     existing_tables = set(inspector.get_table_names())
+    if "twitter_pipeline_jobs" in existing_tables:
+        _ensure_deferred_pipeline_job_status(engine)
     with engine.begin() as connection:
         if "twitter_analytics_cache" not in existing_tables:
             connection.execute(
@@ -85,3 +87,71 @@ def ensure_runtime_schema(engine: Engine) -> None:
                     connection.execute(
                         text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
                     )
+
+
+def _ensure_deferred_pipeline_job_status(engine: Engine) -> None:
+    """Rebuild the SQLite table only when its old CHECK excludes ``deferred``."""
+    with engine.connect() as connection:
+        create_sql = connection.execute(
+            text(
+                "SELECT sql FROM sqlite_master "
+                "WHERE type = 'table' AND name = 'twitter_pipeline_jobs'"
+            )
+        ).scalar_one_or_none()
+        if not create_sql or "deferred" in create_sql.lower():
+            return
+
+        connection.commit()
+        connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        connection.exec_driver_sql("PRAGMA legacy_alter_table=ON")
+        connection.commit()
+        try:
+            with connection.begin():
+                connection.execute(text("ALTER TABLE twitter_pipeline_jobs RENAME TO _old_pipeline_jobs"))
+                connection.execute(
+                    text(
+                        """
+                        CREATE TABLE twitter_pipeline_jobs (
+                            id INTEGER PRIMARY KEY,
+                            job_type VARCHAR(20) NOT NULL DEFAULT 'scraper_job'
+                                CHECK (job_type IN ('scrape_timeline', 'scraper_job', 'update_metric', 'analytics')),
+                            source_id INTEGER REFERENCES twitter_sources(id) ON DELETE SET NULL,
+                            session_username TEXT,
+                            status VARCHAR(10) NOT NULL DEFAULT 'pending'
+                                CHECK (status IN ('pending', 'running', 'done', 'failed', 'deferred')),
+                            tweets_found INTEGER NOT NULL DEFAULT 0,
+                            tweets_new INTEGER NOT NULL DEFAULT 0,
+                            items_total INTEGER NOT NULL DEFAULT 0,
+                            items_updated INTEGER NOT NULL DEFAULT 0,
+                            items_failed INTEGER NOT NULL DEFAULT 0,
+                            rate_limit_hits INTEGER NOT NULL DEFAULT 0,
+                            error_message TEXT,
+                            started_at DATETIME,
+                            finished_at DATETIME
+                        )
+                        """
+                    )
+                )
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO twitter_pipeline_jobs
+                        SELECT id, job_type, source_id, session_username, status,
+                               tweets_found, tweets_new, items_total, items_updated,
+                               items_failed, rate_limit_hits, error_message, started_at, finished_at
+                        FROM _old_pipeline_jobs
+                        """
+                    )
+                )
+                connection.execute(text("DROP TABLE _old_pipeline_jobs"))
+                connection.execute(
+                    text("CREATE INDEX IF NOT EXISTS idx_tw_pipeline_jobs_source_time "
+                         "ON twitter_pipeline_jobs (source_id, started_at DESC)")
+                )
+                connection.execute(
+                    text("CREATE INDEX IF NOT EXISTS idx_tw_pipeline_jobs_type_status "
+                         "ON twitter_pipeline_jobs (job_type, status, started_at DESC)")
+                )
+        finally:
+            connection.exec_driver_sql("PRAGMA legacy_alter_table=OFF")
+            connection.exec_driver_sql("PRAGMA foreign_keys=ON")

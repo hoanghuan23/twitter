@@ -94,6 +94,18 @@ class TwitterPostRepository:
             self.db.flush()
         return count
 
+    def defer_due_metric_updates(
+        self,
+        now: datetime,
+        cutoff: datetime,
+        retry_at: datetime,
+    ) -> int:
+        due_tweets = self.due_for_metric_update(now, cutoff, limit=100_000)
+        for tweet in due_tweets:
+            tweet.next_metric_update = retry_at
+        self.db.flush()
+        return len(due_tweets)
+
     def mark_metric_expired(self, tweet: Tweet) -> Tweet:
         tweet.metric_tier = "expired"
         tweet.is_tracked = False

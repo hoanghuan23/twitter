@@ -13,6 +13,7 @@ from app.models.tweet_metric import TweetMetric
 from app.models.twitter_analytics_cache import TwitterAnalyticsCache
 from app.models.twitter_source import TwitterSource
 from app.services.tweet_metric_update_service import TweetMetricUpdateService
+from app.services.tweet_metric_update_service import NoAccountError
 from app.services import tweet_metric_update_service as metric_update_module
 from app.utils.time import utc_now
 
@@ -32,6 +33,11 @@ class FakeTweetDetailsClient:
             "quoteCount": 0,
             "viewCount": 1000,
         }
+
+
+class NoAccountMetricClient:
+    async def get_tweet_details(self, tweet_id: str):
+        raise NoAccountError("No account available for queue TweetDetail")
 
 
 def raw_tweet(tweet_id: str, content: str, like_count: int = 200):
@@ -335,6 +341,49 @@ def test_update_due_tweet_metrics_expires_old_tweets_without_fetching_details(
     assert tweet.is_tracked is False
     assert tweet.next_metric_update is None
     assert db_session.scalar(select(func.count()).select_from(TweetMetric)) == 0
+
+
+def test_update_due_tweet_metrics_defers_when_twscrape_has_no_account(
+    db_session: Session,
+) -> None:
+    now = utc_now()
+    source = TwitterSource(
+        id=1,
+        source_type="account",
+        twitter_id="12345",
+        twitter_url="https://x.com/example",
+        is_active=True,
+        created_at=now,
+    )
+    tweet = Tweet(
+        source_id=1,
+        tweet_id="123",
+        tweet_url="https://x.com/example/status/123",
+        content="old",
+        posted_at=now,
+        created_at=now,
+        is_tracked=True,
+        metric_tier="warm",
+        next_metric_update=now - timedelta(minutes=1),
+        view_count=100,
+    )
+    db_session.add_all([source, tweet])
+    db_session.commit()
+
+    job = asyncio.run(
+        TweetMetricUpdateService(db_session, client=NoAccountMetricClient()).update_due_tweet_metrics(
+            limit=10
+        )
+    )
+
+    assert job is not None
+    assert job.status == "deferred"
+    assert "TweetDetail" in (job.error_message or "")
+    assert tweet.next_metric_update is not None
+    assert tweet.next_metric_update > now
+    log = db_session.scalar(select(TwitterPipelineLog).where(TwitterPipelineLog.job_id == job.id))
+    assert log is not None
+    assert log.log_level == "WARNING"
 
 
 def test_update_due_tweet_metrics_waits_for_in_process_lock(db_session: Session) -> None:
