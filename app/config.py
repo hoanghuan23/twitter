@@ -18,12 +18,17 @@ class Settings:
     scheduler_enabled: bool = _bool_env("TWITTER_SCHEDULER_ENABLED", True)
     scheduler_interval_seconds: int = int(os.getenv("TWITTER_SCHEDULER_INTERVAL_SECONDS", "120"))
     crawl_due_limit: int = int(os.getenv("TWITTER_CRAWL_DUE_LIMIT", "10"))
+    crawl_source_delay_seconds: float = float(
+        os.getenv("TWITTER_CRAWL_SOURCE_DELAY_SECONDS", "0")
+    )
     metric_due_limit: int = int(os.getenv("TWITTER_METRIC_DUE_LIMIT", "50"))
     default_scrape_interval_minutes: int = int(
         os.getenv("TWITTER_DEFAULT_SCRAPE_INTERVAL_MINUTES", "60")
     )
-    default_crawl_limit: int = int(os.getenv("TWITTER_DEFAULT_CRAWL_LIMIT", "50")) # use for source_type = (hashtag/keyword)
-    account_crawl_limit: int = int(os.getenv("TWITTER_ACCOUNT_CRAWL_LIMIT", "100")) # use for source_type = account
+    # Used for source_type = hashtag/keyword.
+    default_crawl_limit: int = int(os.getenv("TWITTER_DEFAULT_CRAWL_LIMIT", "50"))
+    # Used for source_type = account.
+    account_crawl_limit: int = int(os.getenv("TWITTER_ACCOUNT_CRAWL_LIMIT", "50"))
     no_account_retry_fallback_minutes: int = int(
         os.getenv("TWITTER_NO_ACCOUNT_RETRY_FALLBACK_MINUTES", "15")
     )

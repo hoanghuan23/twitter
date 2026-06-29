@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -36,16 +38,19 @@ async def crawl_source(
 async def crawl_due_sources(db: Session = Depends(get_db)) -> CrawlDueResponse:
     sources = TwitterSourceService(db).due_sources(settings.crawl_due_limit)
     job_ids: list[int] = []
-    for source in sources:
+    for index, source in enumerate(sources):
         job = await TwitterCrawlerService(db).crawl_source(source.id)
         job_ids.append(job.id)
-        if job.status == "deferred":
-            deferred_source = TwitterSourceService(db).repository.get(source.id)
-            retry_at = deferred_source.next_scrape if deferred_source else None
-            if retry_at is not None:
-                TwitterSourceService(db).repository.defer_due_sources(utc_now(), retry_at)
-                db.commit()
-            break
+        # TEMP: Keep crawling the selected due sources even if one source is deferred.
+        # if job.status == "deferred":
+        #     deferred_source = TwitterSourceService(db).repository.get(source.id)
+        #     retry_at = deferred_source.next_scrape if deferred_source else None
+        #     if retry_at is not None:
+        #         TwitterSourceService(db).repository.defer_due_sources(utc_now(), retry_at)
+        #         db.commit()
+        #     break
+        if settings.crawl_source_delay_seconds > 0 and index < len(sources) - 1:
+            await asyncio.sleep(settings.crawl_source_delay_seconds)
     return CrawlDueResponse(jobs_started=len(job_ids), job_ids=job_ids)
 
 

@@ -151,7 +151,9 @@ def test_crawler_service_persists_tweets_metrics_and_job(
     assert "tweets_new=1" in log_messages
 
 
-def test_crawler_defers_when_twscrape_has_no_account(db_session: Session) -> None:
+def test_crawler_fails_without_deferring_when_twscrape_has_no_account(
+    db_session: Session,
+) -> None:
     now = utc_now()
     source = TwitterSource(
         id=1,
@@ -169,12 +171,12 @@ def test_crawler_defers_when_twscrape_has_no_account(db_session: Session) -> Non
         TwitterCrawlerService(db_session, client=NoAccountCrawlerClient()).crawl_source(1)
     )
 
-    assert job.status == "deferred"
+    assert job.status == "failed"
     assert "UserTweets" in (job.error_message or "")
-    assert db_session.get(TwitterSource, 1).next_scrape > now  # type: ignore[union-attr]
+    assert db_session.get(TwitterSource, 1).next_scrape == now  # type: ignore[union-attr]
     log = db_session.scalar(select(TwitterPipelineLog).where(TwitterPipelineLog.job_id == job.id))
     assert log is not None
-    assert log.log_level == "WARNING"
+    assert log.log_level == "ERROR"
 
 
 def test_crawler_service_skips_existing_tweet_metrics_before_due_time(

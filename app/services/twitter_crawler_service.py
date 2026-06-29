@@ -76,14 +76,15 @@ class TwitterCrawlerService:
         items_updated = 0
         tweets_recent_24h_found = 0
         tweets_recent_24h_saved = 0
-        availability = self.account_quota_service.availability("UserTweets")
-        if not availability.available:
-            return self._defer_no_account_job(
-                job.id,
-                source.id,
-                availability.retry_at,
-                "No twscrape account available for queue UserTweets",
-            )
+        # TEMP: Do not block source crawls based on twscrape account locks.
+        # availability = self.account_quota_service.availability("UserTweets")
+        # if not availability.available:
+        #     return self._defer_no_account_job(
+        #         job.id,
+        #         source.id,
+        #         availability.retry_at,
+        #         "No twscrape account available for queue UserTweets",
+        #     )
 
         try:
             affected_dates: set[date] = set()
@@ -145,13 +146,15 @@ class TwitterCrawlerService:
             )
             self.db.commit()
             return job
-        except NoAccountError as exc:
-            return self._defer_no_account_job(
-                job.id,
-                source.id,
-                self.account_quota_service.retry_at("UserTweets"),
-                str(exc) or "No twscrape account available for queue UserTweets",
-            )
+        # TEMP: Let NoAccountError fall through to the generic failure path instead of
+        # deferring this source because an account lock appeared.
+        # except NoAccountError as exc:
+        #     return self._defer_no_account_job(
+        #         job.id,
+        #         source.id,
+        #         self.account_quota_service.retry_at("UserTweets"),
+        #         str(exc) or "No twscrape account available for queue UserTweets",
+        #     )
         except Exception as exc:
             self.db.rollback()
             error_message = str(exc)

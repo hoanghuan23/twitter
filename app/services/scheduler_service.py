@@ -51,7 +51,7 @@ class SchedulerService:
                 len(sources),
                 settings.crawl_due_limit,
             )
-            for source in sources:
+            for index, source in enumerate(sources):
                 logger.info("------------------")
                 logger.info(
                     "Scheduler starting source scrape source_id=%s source_type=%s "
@@ -77,21 +77,32 @@ class SchedulerService:
                 )
                 if job.status == "failed":
                     logger.warning("Crawl job %s failed: %s", job.id, job.error_message)
-                if job.status == "deferred":
-                    deferred_source = source_service.repository.get(source.id)
-                    retry_at = deferred_source.next_scrape if deferred_source else None
-                    if retry_at is not None:
-                        deferred_count = source_service.repository.defer_due_sources(
-                            now=utc_now(),
-                            retry_at=retry_at,
-                        )
-                        db.commit()
-                        logger.warning(
-                            "Crawl queue deferred until %s; postponed due sources count=%s",
-                            retry_at,
-                            deferred_count,
-                        )
-                    break
+                # TEMP: Do not postpone the whole crawl queue when one source is
+                # deferred because twscrape account locks are transient.
+                # if job.status == "deferred":
+                #     deferred_source = source_service.repository.get(source.id)
+                #     retry_at = deferred_source.next_scrape if deferred_source else None
+                #     if retry_at is not None:
+                #         deferred_count = source_service.repository.defer_due_sources(
+                #             now=utc_now(),
+                #             retry_at=retry_at,
+                #         )
+                #         db.commit()
+                #         logger.warning(
+                #             "Crawl queue deferred until %s; postponed due sources count=%s",
+                #             retry_at,
+                #             deferred_count,
+                #         )
+                #     break
+                if (
+                    settings.crawl_source_delay_seconds > 0
+                    and index < len(sources) - 1
+                ):
+                    logger.info(
+                        "Scheduler waiting between source scrapes seconds=%s",
+                        settings.crawl_source_delay_seconds,
+                    )
+                    await asyncio.sleep(settings.crawl_source_delay_seconds)
         return job_ids
 
     async def update_due_tweet_metrics(self) -> int:
