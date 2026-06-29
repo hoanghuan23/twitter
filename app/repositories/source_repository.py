@@ -119,7 +119,13 @@ class TwitterSourceRepository:
             select(TwitterSource)
             .where(TwitterSource.is_active == True)  # noqa: E712
             .where((TwitterSource.next_scrape.is_(None)) | (TwitterSource.next_scrape <= now))
-            .order_by(TwitterSource.next_scrape.asc(), TwitterSource.id.asc())
+            .order_by(
+                TwitterSource.next_scrape.is_not(None).asc(),
+                TwitterSource.last_scraped.is_not(None).asc(),
+                TwitterSource.last_scraped.asc(),
+                TwitterSource.next_scrape.asc(),
+                TwitterSource.id.asc(),
+            )
             .limit(limit)
         )
         return list(self.db.scalars(stmt))

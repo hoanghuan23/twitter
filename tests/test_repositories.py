@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models.tweet import Tweet
 from app.models.twitter_source import TwitterSource
 from app.repositories.post_repository import TwitterPostRepository
+from app.repositories.source_repository import TwitterSourceRepository
 from app.utils.time import utc_now
 
 
@@ -102,6 +103,76 @@ def test_due_metric_update_skips_expired_and_untracked(db_session: Session) -> N
     )
 
     assert [tweet.tweet_id for tweet in due] == ["due"]
+
+
+def test_due_sources_prioritize_unscheduled_then_oldest_scraped(
+    db_session: Session,
+) -> None:
+    now = utc_now()
+    db_session.add_all(
+        [
+            TwitterSource(
+                id=1,
+                source_type="account",
+                twitter_id="1",
+                twitter_url="https://x.com/one",
+                source_name="one",
+                is_active=True,
+                created_at=now,
+                last_scraped=now - timedelta(hours=1),
+                next_scrape=now - timedelta(minutes=5),
+            ),
+            TwitterSource(
+                id=2,
+                source_type="account",
+                twitter_id="2",
+                twitter_url="https://x.com/two",
+                source_name="two",
+                is_active=True,
+                created_at=now,
+                last_scraped=now - timedelta(days=2),
+                next_scrape=None,
+            ),
+            TwitterSource(
+                id=3,
+                source_type="account",
+                twitter_id="3",
+                twitter_url="https://x.com/three",
+                source_name="three",
+                is_active=True,
+                created_at=now,
+                last_scraped=None,
+                next_scrape=None,
+            ),
+            TwitterSource(
+                id=4,
+                source_type="account",
+                twitter_id="4",
+                twitter_url="https://x.com/four",
+                source_name="four",
+                is_active=True,
+                created_at=now,
+                last_scraped=now - timedelta(days=5),
+                next_scrape=now - timedelta(minutes=10),
+            ),
+            TwitterSource(
+                id=5,
+                source_type="account",
+                twitter_id="5",
+                twitter_url="https://x.com/five",
+                source_name="five",
+                is_active=True,
+                created_at=now,
+                last_scraped=now - timedelta(days=7),
+                next_scrape=now + timedelta(minutes=10),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    due = TwitterSourceRepository(db_session).due_sources(now, limit=4)
+
+    assert [source.id for source in due] == [3, 2, 4, 1]
 
 
 def test_expire_metric_tracking_older_than_marks_tracked_old_tweets(
