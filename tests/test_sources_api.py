@@ -350,6 +350,37 @@ def test_create_keyword_source_from_source_name(
     assert db_session.query(TwitterSource).count() == 1
 
 
+def test_create_hashtag_source_dedupes_by_twitter_url(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    twitter_url = "https://x.com/search?q=%23worldcup&src=typed_query"
+    first_response = client.post(
+        "/sources",
+        json={
+            "source_type": "hashtag",
+            "source_name": " #WorldCup ",
+            "twitter_url": twitter_url,
+        },
+    )
+    second_response = client.post(
+        "/sources",
+        json={
+            "source_type": "hashtag",
+            "source_name": "#worldcup",
+            "twitter_url": twitter_url,
+            "include_replies": True,
+        },
+    )
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 201
+    assert second_response.json()["id"] == first_response.json()["id"]
+    assert second_response.json()["source_name"] == "#worldcup"
+    assert second_response.json()["include_replies"] is True
+    assert db_session.query(TwitterSource).count() == 1
+
+
 def test_create_source_reports_unavailable_twscrape_account(
     client: TestClient,
     db_session: Session,

@@ -58,7 +58,8 @@ CREATE TABLE twitter_sources (
         protected        BOOLEAN DEFAULT FALSE,
         verified         BOOLEAN DEFAULT FALSE,
 
-        UNIQUE (twitter_id, source_type)
+        UNIQUE (twitter_id, source_type),
+        UNIQUE (twitter_url)
 );
 CREATE INDEX idx_tw_source_active     ON twitter_sources (is_active);
 CREATE INDEX idx_tw_source_next_scrape ON twitter_sources (next_scrape);

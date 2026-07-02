@@ -10,7 +10,6 @@ from app.database import Base
 
 class TwitterSource(Base):
     __tablename__ = "twitter_sources"
-    __table_args__ = (UniqueConstraint("twitter_id", "source_type"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     source_type: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -36,6 +35,11 @@ class TwitterSource(Base):
     source_score: Mapped[int | None] = mapped_column(Integer)
     protected: Mapped[bool | None] = mapped_column(Boolean, default=False)
     verified: Mapped[bool | None] = mapped_column(Boolean, default=False)
+
+    __table_args__ = (
+        UniqueConstraint("twitter_id", "source_type"),
+        UniqueConstraint("twitter_url"),
+    )
 
     topic = relationship("Topic", back_populates="sources")
     tweets = relationship("Tweet", back_populates="source")

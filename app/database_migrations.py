@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from sqlalchemy import Engine, inspect, text
+from sqlalchemy.exc import SQLAlchemyError
 
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,30 @@ def ensure_runtime_schema(engine: Engine) -> None:
                     connection.execute(
                         text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
                     )
+        if "twitter_sources" in existing_tables:
+            _ensure_twitter_source_unique_indexes(connection)
+
+
+def _ensure_twitter_source_unique_indexes(connection) -> None:
+    index_statements = [
+        (
+            "uq_tw_source_twitter_url",
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_tw_source_twitter_url
+            ON twitter_sources (twitter_url)
+            """,
+        ),
+    ]
+    for index_name, statement in index_statements:
+        try:
+            connection.execute(text(statement))
+        except SQLAlchemyError:
+            logger.warning(
+                "Could not create unique index %s on twitter_sources. "
+                "Existing duplicate rows may need cleanup first.",
+                index_name,
+                exc_info=True,
+            )
 
 
 def _ensure_deferred_pipeline_job_status(engine: Engine) -> None:
