@@ -94,15 +94,6 @@ class SchedulerService:
                 #             deferred_count,
                 #         )
                 #     break
-                if (
-                    settings.crawl_source_delay_seconds > 0
-                    and index < len(sources) - 1
-                ):
-                    logger.info(
-                        "Scheduler waiting between source scrapes seconds=%s",
-                        settings.crawl_source_delay_seconds,
-                    )
-                    await asyncio.sleep(settings.crawl_source_delay_seconds)
         return job_ids
 
     async def update_due_tweet_metrics(self) -> int:

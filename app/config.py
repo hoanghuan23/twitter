@@ -18,9 +18,6 @@ class Settings:
     scheduler_enabled: bool = _bool_env("TWITTER_SCHEDULER_ENABLED", True)
     scheduler_interval_seconds: int = int(os.getenv("TWITTER_SCHEDULER_INTERVAL_SECONDS", "120"))
     crawl_due_limit: int = int(os.getenv("TWITTER_CRAWL_DUE_LIMIT", "10"))
-    crawl_source_delay_seconds: float = float(
-        os.getenv("TWITTER_CRAWL_SOURCE_DELAY_SECONDS", "0")
-    )
     metric_due_limit: int = int(os.getenv("TWITTER_METRIC_DUE_LIMIT", "50"))
     default_scrape_interval_minutes: int = int(
         os.getenv("TWITTER_DEFAULT_SCRAPE_INTERVAL_MINUTES", "60")

@@ -49,8 +49,6 @@ async def crawl_due_sources(db: Session = Depends(get_db)) -> CrawlDueResponse:
         #         TwitterSourceService(db).repository.defer_due_sources(utc_now(), retry_at)
         #         db.commit()
         #     break
-        if settings.crawl_source_delay_seconds > 0 and index < len(sources) - 1:
-            await asyncio.sleep(settings.crawl_source_delay_seconds)
     return CrawlDueResponse(jobs_started=len(job_ids), job_ids=job_ids)
 
 
